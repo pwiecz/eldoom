@@ -1467,26 +1467,29 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
       (setq prev slow)
       (setq slow (ern--draw-item-next slow))
       (setq fast (ern--draw-item-next (ern--draw-item-next fast))))
-
     (when prev
       (setf (ern--draw-item-next prev) nil))
-
     slow))
 
 (defun ern--merge-draw-items (head1 head2)
-  (if (null head1) head2
-    (if (null head2) head1
-      (let (result)
-        (if (< (ern--draw-item-scale-fx head1) (ern--draw-item-scale-fx head2))
-            (progn
-              (setq result head1)
-              (setf (ern--draw-item-next result)
-                    (ern--merge-draw-items (ern--draw-item-next head1) head2)))
-          (progn
-            (setq result head2)
-            (setf (ern--draw-item-next result)
-                  (ern--merge-draw-items head1 (ern--draw-item-next head2)))))
-        result))))
+  (cond
+   ((null head1) head2)
+   ((null head2) head1)
+   (t (let* ((head
+              (if (< (ern--draw-item-scale-fx head1) (ern--draw-item-scale-fx head2))
+                  (prog1 head1 (setq head1 (ern--draw-item-next head1)))
+                (prog1 head2 (setq head2 (ern--draw-item-next head2)))))
+             (tail head))
+        (while (and head1 head2)
+          (if (< (ern--draw-item-scale-fx head1) (ern--draw-item-scale-fx head2))
+              (setf (ern--draw-item-next tail) head1
+                    tail head1
+                    head1 (ern--draw-item-next head1))
+            (setf (ern--draw-item-next tail) head2
+                  tail head2
+                  head2 (ern--draw-item-next head2))))
+        (setf (ern--draw-item-next tail) (or head1 head2))
+        head))))
 
 (defun ern--merge-sort-draw-items (head)
   (if (or (null head) (null (ern--draw-item-next head)))

@@ -66,32 +66,37 @@
       (setq prev slow)
       (setq slow (etr-intercept-next slow))
       (setq fast (etr-intercept-next (etr-intercept-next fast))))
-    
+
     (when prev
       (setf (etr-intercept-next prev) nil))
-    
+
     slow))
 
 (defun etr--merge-intercepts (head1 head2)
-  (if (null head1) head2
-    (if (null head2) head1
-      (let (result)
-        (if (< (etr-intercept-frac head1) (etr-intercept-frac head2))
-            (progn
-              (setq result head1)
-              (setf (etr-intercept-next result) 
-                    (etr--merge-intercepts (etr-intercept-next head1) head2)))
-          (progn
-            (setq result head2)
-            (setf (etr-intercept-next result) 
-                  (etr--merge-intercepts head1 (etr-intercept-next head2)))))
-        result))))
+  (cond
+   ((null head1) head2)
+   ((null head2) head1)
+   (t (let* ((head
+              (if (< (etr-intercept-frac head1) (etr-intercept-frac head2))
+                  (prog1 head1 (setq head1 (etr-intercept-next head1)))
+                (prog1 head2 (setq head2 (etr-intercept-next head2)))))
+             (tail head))
+        (while (and head1 head2)
+          (if (< (etr-intercept-frac head1) (etr-intercept-frac head2))
+              (setf (etr-intercept-next tail) head1
+                    tail head1
+                    head1 (etr-intercept-next head1))
+            (setf (etr-intercept-next tail) head2
+                  tail head2
+                  head2 (etr-intercept-next head2))))
+        (setf (etr-intercept-next tail) (or head1 head2))
+        head))))
 
 (defun etr--merge-sort-intercepts (head)
   (if (or (null head) (null (etr-intercept-next head)))
       head
     (let* ((right (etr--split-intercepts head)))
-      (etr--merge-intercepts 
+      (etr--merge-intercepts
        (etr--merge-sort-intercepts head)
        (etr--merge-sort-intercepts right)))))
 
@@ -309,7 +314,7 @@ Returns non nil if we should stop checking"
   (let ((x2 (+ (emo-x-fx mobj) (eldoom-math-mul distance (eldoom-math-cos angle))))
         (y2 (+ (emo-y-fx mobj) (eldoom-math-mul distance (eldoom-math-cos angle)))))
     (setf (etr--aim-state-shooter etr--aim-state) mobj
-          (etr--aim-state-shoot-z etr--aim-state) 
+          (etr--aim-state-shoot-z etr--aim-state)
           (+ (emo-z-fx mobj) (/ (emo-height-fx mobj) 2) (eldoom-math-fixed-from-int 8))
           (etr--aim-state-top-slope etr--aim-state) (/ (eldoom-math-fixed-from-int 100) 160)
           (etr--aim-state-bottom-slope etr--aim-state) (/ (eldoom-math-fixed-from-int -100) 160)
@@ -392,13 +397,13 @@ P_LineAttack in p_map.c"
           (etr--shoot-state-shoot-z etr--shoot-state) z1
           (etr--shoot-state-attack-range etr--shoot-state) distance
           (etr--shoot-state-aim-slope etr--shoot-state) slope)
-    (when-let* 
+    (when-let*
         ((intercept (catch :hit
                       (etr-path-traverse x1 y1 (+ x1 dx) (+ y1 dy)
                                          (logior etr-pt-addlines etr-pt-addthings)
                                          #'etr--shoot-traverse etr--shoot-state))))
       (if (ewd-linedef-p (etr-intercept-item intercept))
-          (let* ((frac (- (etr-intercept-frac intercept) 
+          (let* ((frac (- (etr-intercept-frac intercept)
                           (eldoom-math-div (eldoom-math-fixed-from-int 4) distance)))
                  (x (+ x1 (eldoom-math-mul dx frac)))
                  (y (+ y1 (eldoom-math-mul dy frac)))
@@ -447,7 +452,7 @@ P_LineAttack in p_map.c"
         (etr--radius-attack-state-source etr--radius-attack-state) source
         (etr--radius-attack-state-damage etr--radius-attack-state) damage)
   (let* ((dist (eldoom-math-fixed-from-int damage)))
-    (emo-for-each-in-block-overlapping-bbox 
+    (emo-for-each-in-block-overlapping-bbox
      (- (emo-x-fx spot) dist) (+ (emo-x-fx spot) dist)
      (- (emo-y-fx spot) dist) (+ (emo-y-fx spot) dist)
      #'etr--radius-attack-callback etr--radius-attack-state)))
