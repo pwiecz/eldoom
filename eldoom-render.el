@@ -131,7 +131,7 @@ Part of R_ProjectSprite in r_things.c"
           (ern--drawseg-type ds) type
           (ern--drawseg-next ds) (ern--scene-drawseg scene)
           (ern--scene-drawseg scene) ds)
-    
+
     ;; If it is a portal (window/step), we must save the silhouette limits
     ;; exactly as they were BEFORE this wall mutated them.
     (when (eq type 'portal)
@@ -182,15 +182,15 @@ Part of R_ProjectSprite in r_things.c"
   "Calculate the exact vertical clip bounds for a sprite based on all drawn walls."
   (fillarray ern--sprite-clip-top 0)
   (fillarray ern--sprite-clip-bottom (1- canvas-height))
-  
+
   (let ((spr-x1 (ern--vissprite-x1 sprite))
         (spr-x2 (ern--vissprite-x2 sprite))
         (spr-scale (ern--vissprite-scale-fx sprite)))
-    
+
     (while drawseg
       (let* ((ds-x1 (ern--drawseg-x1 drawseg))
              (ds-x2 (ern--drawseg-x2 drawseg)))
-        
+
         ;; Check for horizontal overlap on the screen
         (when (and (<= ds-x1 spr-x2) (>= ds-x2 spr-x1))
           (let* ((clip-start (max spr-x1 ds-x1))
@@ -200,7 +200,7 @@ Part of R_ProjectSprite in r_things.c"
                  ;; Per-column scale change, kept as an exact integer ratio.
                  (ds-span (- ds-x2 ds-x1))
                  (ds-dscale (- ds-scale2 ds-scale1)))
-            
+
             (if (eq (ern--drawseg-type drawseg) 'solid)
                 ;; Solid Wall Clipping
                 (cl-loop for c from clip-start to clip-end do
@@ -211,7 +211,7 @@ Part of R_ProjectSprite in r_things.c"
                            (when (> wall-scale spr-scale)
                              (aset ern--sprite-clip-top c 1000)
                              (aset ern--sprite-clip-bottom c -1000))))
-              
+
               ;; Portal Window Clipping
               (let ((ds-top-array (ern--drawseg-top-clip-array drawseg))
                     (ds-bot-array (ern--drawseg-bottom-clip-array drawseg)))
@@ -220,11 +220,11 @@ Part of R_ProjectSprite in r_things.c"
                                                ds-scale1
                                              (+ ds-scale1 (/ (* ds-dscale (- c ds-x1)) ds-span)))))
                            (when (> wall-scale spr-scale)
-                             (aset ern--sprite-clip-top c 
-                                   (max (aref ern--sprite-clip-top c) 
+                             (aset ern--sprite-clip-top c
+                                   (max (aref ern--sprite-clip-top c)
                                         (aref ds-top-array c)))
-                             (aset ern--sprite-clip-bottom c 
-                                   (min (aref ern--sprite-clip-bottom c) 
+                             (aset ern--sprite-clip-bottom c
+                                   (min (aref ern--sprite-clip-bottom c)
                                         (aref ds-bot-array c)))))))))))
       (setq drawseg (ern--drawseg-next drawseg)))))
 
@@ -255,12 +255,12 @@ Part of R_ProjectSprite in r_things.c"
       (let ((tex-data (ewd-flat-data tex)))
         (and (stringp tex-data) (= (length tex-data) 4096)))))
 
-(defun ern--check-visplane 
+(defun ern--check-visplane
     (scene x top bottom height texture light ceiling-p)
   (when (and (<= top bottom)
              texture
              (ern--valid-visplane-texture-p texture))
-    (let* ((vp (ern--find-active-visplane 
+    (let* ((vp (ern--find-active-visplane
                 scene x height texture light ceiling-p)))
       (when (not vp)
         (setf vp (ern--visplane-new-from-freelist)
@@ -418,8 +418,8 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
   (logand span #xffff))
 
 (defun ern--draw-projected-column-clipped-fx
-    (scene bitmap data-offset column 
-           near-floor near-floor-texture near-ceiling near-ceiling-texture 
+    (scene bitmap data-offset column
+           near-floor near-floor-texture near-ceiling near-ceiling-texture
            far-floor far-ceiling far-sector
            middle-texture upper-texture lower-texture tex-x-fx
            texture-y-offset colormap palette light
@@ -440,22 +440,22 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
     (unless (aref clip-solid-vector column)
       (let* ((clip-top (aref clip-top-vector column))
              (clip-bottom (aref clip-bottom-vector column))
-             
+
              ;; --- THE DOOM SKY HACK ---
              (far-is-sky (and far-sector (eq (ewd-sector-ceiling-texture far-sector) 'sky))))
-        
+
         (when (<= clip-top clip-bottom)
           (let* ((near-ceil-y (eldoom-math-fixed-ceil nc-y-fx))
                  (near-floor-y (eldoom-math-fixed-to-int nf-y-fx))
-                 
+
                  ;; Normal ceiling and floor visplane bounds for the near sector
                  (vis-ceil-bottom (min (1- near-ceil-y) clip-bottom (1- near-floor-y)))
                  (vis-floor-top (max near-floor-y clip-top near-ceil-y)))
 
             ;; 1. Check Near Ceiling Visplane
             (when (>= vis-ceil-bottom clip-top)
-              (ern--check-visplane 
-               scene column clip-top vis-ceil-bottom 
+              (ern--check-visplane
+               scene column clip-top vis-ceil-bottom
                near-ceiling near-ceiling-texture light t))
 
             ;; 2. The Doom Sky Upper-Wall Hack
@@ -470,10 +470,10 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
 
             ;; 3. Check Near Floor Visplane
             (when (<= vis-floor-top clip-bottom)
-              (ern--check-visplane 
-               scene column vis-floor-top clip-bottom 
+              (ern--check-visplane
+               scene column vis-floor-top clip-bottom
                near-floor near-floor-texture light nil)))
-          
+
           (if (not far-sector)
               (progn
                 ;; 1. SOLID WALL (1-sided line)
@@ -486,10 +486,10 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                  near-ceiling near-floor nil nil
                  view-z center-y-fx scale-fx)
                 (aset clip-solid-vector column t))
-            
+
             ;; 2. PORTAL (2-sided line)
             (let ((middle-drawn nil))
-              
+
               ;; --- UPPER WALL & CEILING CLIP ---
               (if (< far-ceiling near-ceiling)
                   (progn
@@ -503,7 +503,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                        near-ceiling near-floor far-ceiling far-floor
                        view-z center-y-fx scale-fx))
                     ;; Upper wall ends at floor(fc). Portal top must strictly start at floor(fc) + 1.
-                    (aset clip-top-vector column (min (1+ clip-bottom) 
+                    (aset clip-top-vector column (min (1+ clip-bottom)
                                                       (max clip-top (1+ (eldoom-math-fixed-to-int fc-y-fx)))))
                     (setq clip-top (aref clip-top-vector column)))
 
@@ -532,7 +532,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                 (aset clip-bottom-vector column (max (1- clip-top) (min clip-bottom (1- (eldoom-math-fixed-to-int nf-y-fx)))))
                 (setq clip-bottom (aref clip-bottom-vector column)))
 
-              
+
               ;; --- MIDDLE WALL (Transparent Grate) ---
               (when (and (<= clip-top clip-bottom) middle-texture)
                 (setq middle-drawn (ern--draw-wall-span-clipped-fx
@@ -565,16 +565,16 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
       (let* ((tex-width (ewd-texture-width sky-texture))
              (tex-height (ewd-texture-height sky-texture))
              (tex-columns (ewd-texture-columns sky-texture))
-             
+
              ;; The sky repeats 4 times over 360 degrees: a full circle (the BAM
              ;; range 2^32) maps to 1024 texture columns, i.e. a right shift of 22.
-             
+
              ;; Scale vertically based strictly on Doom's native 200px logical height.
              (y-scale (/ 200.0 eldoom-canvas-height))
-             
+
              ;; Vanilla Doom explicitly anchors the horizon to texture row 100.
              (horizon-anchor 100.0))
-        
+
         (cl-loop for x from min-x to max-x do
                  (let ((top (aref top-vector x))
                        (bottom (aref bottom-vector x)))
@@ -587,7 +587,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                             (offset (+ data-offset (* 3 (+ x (* y eldoom-canvas-width)))))
                             (stride (* 3 eldoom-canvas-width)))
                        (while (<= y bottom)
-                         
+
                          ;; Map screen Y to texture Y using the flat orthographic scale
                          (let* ((tex-y-float (+ (* (- y center-y) y-scale) horizon-anchor))
                                 (tex-y (mod (floor tex-y-float) tex-height))
@@ -682,7 +682,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                       (setq min-y (min min-y top)
                             max-y (max max-y bot))))
                   (setq x (1+ x))))
-              
+
               ;; 2. Y-Axis Projection Loop
               (let ((y min-y))
                 (while (<= y max-y)
@@ -695,30 +695,30 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                       ;; comes first (Doom yslope) to keep FixedDiv from saturating.
                       (let* ((yslope-fx (eldoom-math-div center-x-fx denom-fx))
                              (distance-fx (eldoom-math-mul plane-height-fx yslope-fx))
-                             (colormap (ern--find-visplane-colormap scene light 
+                             (colormap (ern--find-visplane-colormap scene light
                                                                     distance-fx extra-light))
                              (fx-step (eldoom-math-mul distance-fx (eldoom-math-div sin-fx projection-plane)))
                              (fy-step (eldoom-math-mul distance-fx (eldoom-math-div cos-fx projection-plane)))
                              (x min-x))
-                        
+
                         ;; 3. Span Extraction Loop
                         (while (<= x max-x)
                           ;; Fast-forward through empty space
-                          (while (and (<= x max-x) 
-                                      (or (< y (aref top-vector x)) 
+                          (while (and (<= x max-x)
+                                      (or (< y (aref top-vector x))
                                           (> y (aref bottom-vector x))))
                             (setq x (1+ x)))
-                          
+
                           (when (<= x max-x)
                             (let ((span-start x))
                               ;; Find the end of this contiguous span
-                              (while (and (<= x max-x) 
-                                          (<= (aref top-vector x) y) 
+                              (while (and (<= x max-x)
+                                          (<= (aref top-vector x) y)
                                           (<= y (aref bottom-vector x)))
                                 (setq x (1+ x)))
                               (let ((span-end (1- x)))
-                                
-                                ;; Algebraic Step Jumping: 
+
+                                ;; Algebraic Step Jumping:
                                 ;; Calculate exact texture coordinates directly for the span start
                                 (let* ((side-fx (eldoom-math-div (- center-x-fx (+ (eldoom-math-fixed-from-int span-start) 32768))
                                                                  projection-plane))
@@ -732,13 +732,13 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                                        (fy (- world-y-fx))
                                        (draw-x span-start)
                                        (offset (+ data-offset (* 3 (+ draw-x (* y eldoom-canvas-width))))))
-                                  
+
                                   (while (<= draw-x span-end)
                                     (let* ((color-offset (+ (logand (eldoom-math-fixed-to-int fx) 63)
                                                             (* 64 (logand (eldoom-math-fixed-to-int fy) 63))))
                                            (color-index (aref flat-data color-offset)))
                                       (ern--draw-pixel bitmap offset color-index colormap palette))
-                                    
+
                                     (setq draw-x (1+ draw-x)
                                           offset (+ offset 3)
                                           fx (+ fx fx-step)
@@ -778,7 +778,7 @@ left of centre have positive (counter-clockwise) angles, like vanilla."
            :vissprite nil
            :drawseg nil
            :sky-texture (ewd-map-sky-texture map))))
-    (eldoom-math-set-projection (ern--scene-projection scene) 
+    (eldoom-math-set-projection (ern--scene-projection scene)
                                 (eldoom-math-fixed-from-int eldoom-canvas-width)
                                 (eldoom-math-fixed-from-int eldoom-canvas-height)
                                 (eldoom-math-radians-to-bam eldoom-fov))
@@ -856,7 +856,7 @@ ANGLE and HALF-FOV are BAM angles."
 
 (defun ern--ray-intersect-aabb-p (x-fx y-fx dx-fx dy-fx top-fx bottom-fx left-fx right-fx)
   "Check if a 2D ray starting at (X, Y) with direction (DX, DY) intersects an AABB."
-  (let ((tmin eldoom-math-int-min) 
+  (let ((tmin eldoom-math-int-min)
         (tmax eldoom-math-int-max))
     (if (= dx-fx 0)
         (unless (and (<= left-fx x-fx) (<= x-fx right-fx))
@@ -890,7 +890,7 @@ ANGLE and HALF-FOV are BAM angles."
               (ern--point-visible-p right-fx bottom-fx x-fx y-fx angle half-fov)
               (ern--point-visible-p right-fx top-fx x-fx y-fx angle half-fov))
           t ;; 2. Any corner is inside the view frustum
-        
+
         ;; 3. The bounding box is so large it straddles the frustum rays.
         ;; We test if the left or right FOV bounding rays intersect the AABB.
         (let ((left-ray-dx (eldoom-math-cos (eldoom-math-ang (+ angle half-fov))))
@@ -907,9 +907,8 @@ ANGLE and HALF-FOV are BAM angles."
    ;; TODO: handle shadow draws
    (fixed-colormap fixed-colormap)
    ((enf-state-fullbright (emo-state mobj)) (aref colormaps 0))
-   (t   
-    (let* (;;(distance-int (/ eldoom-math-unit (max 1 scale-fx)))
-           (lightmap-index (ern--column-lightmap-index-fx sector-light scale-fx light-adjust)))
+   (t
+    (let* ((lightmap-index (ern--column-lightmap-index-fx sector-light scale-fx light-adjust)))
       (aref colormaps lightmap-index)))))
 
 (defun ern--try-queue-vissprite
@@ -939,7 +938,7 @@ ANGLE and HALF-FOV are BAM angles."
                  (patch-y-offset (ewd-patch-y-offset patch))
                  (scale-fx (eldoom-math-div projection-plane front))
                  (screen-x-fx (- center-x-fx (eldoom-math-mul projection-plane (eldoom-math-div side front))))
-                 
+
                  (real-x1 (eldoom-math-fixed-to-int (- screen-x-fx (* patch-x-offset scale-fx))))
                  (x1 (max 0 real-x1))
                  (x2 (min (1- eldoom-canvas-width)
@@ -1042,9 +1041,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
     (if fixed-colormap
         fixed-colormap
       (let* ((colormaps (ern--scene-colormaps scene))
-             ;;(projection-plane (ern--scene-projection-plane scene))
-             (colormap-index (ern--column-lightmap-index-fx sector-light scale-fx;;(/ projection-plane (max 1 scale-fx))
-                                                            light-adjust)))
+             (colormap-index (ern--column-lightmap-index-fx sector-light scale-fx light-adjust)))
         (aref colormaps colormap-index)))))
 
 (defun ern--draw-candidate-projected
@@ -1112,12 +1109,12 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
              (screen-x2-fx (eldoom-math-apply-projection-x projection side2 front2))
              (screen-dx-fx (- screen-x2-fx screen-x1-fx)))
         (unless (< (abs screen-dx-fx) 4)        ; sub-pixel-thin: skip degenerate wall
-          
+
           ;; Guarantees the pixel center (+ 0.5) is ALWAYS inside the segment.
           ;; Mathematically prevents Z-extrapolation (ceiling pillars).
           (let* ((raw-start (eldoom-math-fixed-ceil (- screen-x1-fx 32768)))
                  (raw-end (eldoom-math-fixed-to-int (- screen-x2-fx 32768))))
-            
+
             (when (and (<= raw-start (1- eldoom-canvas-width)) (>= raw-end 0) (<= raw-start raw-end))
               (let* ((start-column (eldoom-math-clamp raw-start 0 (1- eldoom-canvas-width)))
                      (end-column (eldoom-math-clamp raw-end 0 (1- eldoom-canvas-width)))
@@ -1136,19 +1133,19 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                      (scale-step-fx (if (= scale-span 0) 0
                                       (/ (- scale2-fx scale1-fx) scale-span)))
                      (scale-start-fx scale1-fx)
-                     
+
                      ;; Heights relative to the viewer (integer world units).
                      (k-near-ceil (- view-z near-ceiling-height))
                      (k-near-floor (- view-z near-floor-height))
                      (k-far-ceil (when far-ceiling-height (- view-z far-ceiling-height)))
                      (k-far-floor (when far-floor-height (- view-z far-floor-height)))
-                     
+
                      ;; Screen Y = center + height * scale (integer * fixed = fixed).
                      (nc-y-fx (+ center-y-fx (* k-near-ceil scale-start-fx)))
                      (nf-y-fx (+ center-y-fx (* k-near-floor scale-start-fx)))
                      (fc-y-fx (when k-far-ceil (+ center-y-fx (* k-far-ceil scale-start-fx))))
                      (ff-y-fx (when k-far-floor (+ center-y-fx (* k-far-floor scale-start-fx))))
-                     
+
                      ;; Per-single-column Y steps (loop-invariant).
                      (nc-y-step-fx (* k-near-ceil scale-step-fx))
                      (nf-y-step-fx (* k-near-floor scale-step-fx))
@@ -1207,7 +1204,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                                      (aref xtoviewangle column)))
                           (colormap (ern--find-drawseg-colormap scene (ewd-sector-light near-sector)
                                                                 scale-start-fx light-adjust)))
-                      
+
                       (ern--draw-projected-column-clipped-fx
                        scene bitmap data-offset
                        column near-floor-height near-floor-texture near-ceiling-height near-ceiling-texture far-floor-height far-ceiling-height
@@ -1215,7 +1212,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                        lower-texture tex-x-fx texture-y-offset colormap palette light
                        nc-y-fx nf-y-fx fc-y-fx ff-y-fx
                        upper-unpegged-p lower-unpegged-p view-z scale-start-fx)))
-                  
+
                   (setq column (1+ column)
                         scale-start-fx (+ scale-start-fx scale-step-fx)
                         nc-y-fx (+ nc-y-fx nc-y-step-fx)
@@ -1273,7 +1270,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
 
 (defun ern--render-subsector
     (scene bitmap data-offset
-           subsector x-fx y-fx angle cos-fx sin-fx 
+           subsector x-fx y-fx angle cos-fx sin-fx
            view-z palette)
   (let* ((segs (ewd-subsector-segs subsector)))
     (cl-loop for seg across segs do
@@ -1299,13 +1296,13 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
 
 (defun ern--render-node
     (scene bitmap data-offset
-           node x-fx y-fx angle cos-fx sin-fx 
+           node x-fx y-fx angle cos-fx sin-fx
            view-z palette)
   (if (ewd-subsector-p node)
       (ern--render-subsector
        scene bitmap data-offset
        node
-       x-fx y-fx angle cos-fx sin-fx view-z 
+       x-fx y-fx angle cos-fx sin-fx view-z
        palette)
     (let* ((right-child-p (emp-point-in-right-child-p node x-fx y-fx))
            (front-child (if right-child-p
@@ -1320,44 +1317,44 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
 
       (ern--render-node
        scene bitmap data-offset
-       front-child x-fx y-fx angle cos-fx sin-fx 
+       front-child x-fx y-fx angle cos-fx sin-fx
        view-z palette)
-      
+
       ;; 2. Only traverse the back side if its bounding box is within the FOV
       ;; AND if the screen isn't already completely blocked by solid walls.
       (unless (ern--screen-solid-p eldoom-canvas-width)
         (when (ern--bbox-visible-p back-bbox x-fx y-fx angle (ern--scene-half-fov scene))
           (ern--render-node
            scene bitmap data-offset
-           back-child x-fx y-fx angle cos-fx sin-fx 
+           back-child x-fx y-fx angle cos-fx sin-fx
            view-z palette))))))
 
 (defun ern--draw-vissprite (vissprite drawseg bitmap data-offset palette)
   ;; (declare (speed 3) (safety 0))
-  
+
   ;; Dynamically carve the visibility bounds ---
   (ern--clip-sprite-against-drawsegs vissprite drawseg eldoom-canvas-height)
-  
+
   (let* ((x1 (max 0 (ern--vissprite-x1 vissprite)))
          (x2 (min (1- eldoom-canvas-width) (ern--vissprite-x2 vissprite)))
-         (real-x1 (ern--vissprite-texture-x-fx vissprite)) 
+         (real-x1 (ern--vissprite-texture-x-fx vissprite))
          (scale-fx (ern--vissprite-scale-fx vissprite))
          (top-y-fx (ern--vissprite-texture-y-fx vissprite))
          (patch (ern--vissprite-patch vissprite))
          (colormap (ern--vissprite-colormap vissprite))
          (columns (ewd-patch-columns patch))
          (patch-width (ewd-patch-width patch)))
-    
+
     (when (and (> scale-fx 0) columns (<= x1 x2))
       (let ((inv-scale-fx (eldoom-math-div eldoom-math-unit scale-fx)))
         (cl-loop for column from x1 to x2 do
-                 
+
                  ;; Read from our newly built dynamic arrays
                  (let ((clip-top-col (aref ern--sprite-clip-top column))
                        (clip-bottom-col (aref ern--sprite-clip-bottom column)))
-                   
+
                    (when (<= clip-top-col clip-bottom-col)
-                     (let* ((patch-column-index 
+                     (let* ((patch-column-index
                              (min (1- patch-width)
                                   (max 0 (eldoom-math-fixed-to-int (* (- column real-x1) inv-scale-fx)))))
                             (patch-column (aref columns patch-column-index)))
@@ -1367,10 +1364,10 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                                        (post-height (length data))
                                        (screen-y-start (eldoom-math-fixed-to-int (+ top-y-fx (* post-y scale-fx))))
                                        (screen-y-end (eldoom-math-fixed-to-int (+ top-y-fx (* (+ post-y post-height) scale-fx))))
-                                       
+
                                        (draw-y-start (max clip-top-col screen-y-start))
                                        (draw-y-end (min clip-bottom-col (1- screen-y-end))))
-                                  
+
                                   (when (<= draw-y-start draw-y-end)
                                     (ern--draw-column-span
                                      bitmap data-offset column draw-y-start draw-y-end
@@ -1470,10 +1467,10 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
       (setq prev slow)
       (setq slow (ern--draw-item-next slow))
       (setq fast (ern--draw-item-next (ern--draw-item-next fast))))
-    
+
     (when prev
       (setf (ern--draw-item-next prev) nil))
-    
+
     slow))
 
 (defun ern--merge-draw-items (head1 head2)
@@ -1483,11 +1480,11 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
         (if (< (ern--draw-item-scale-fx head1) (ern--draw-item-scale-fx head2))
             (progn
               (setq result head1)
-              (setf (ern--draw-item-next result) 
+              (setf (ern--draw-item-next result)
                     (ern--merge-draw-items (ern--draw-item-next head1) head2)))
           (progn
             (setq result head2)
-            (setf (ern--draw-item-next result) 
+            (setf (ern--draw-item-next result)
                   (ern--merge-draw-items head1 (ern--draw-item-next head2)))))
         result))))
 
@@ -1495,7 +1492,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
   (if (or (null head) (null (ern--draw-item-next head)))
       head
     (let* ((right (ern--split-draw-items head)))
-      (ern--merge-draw-items 
+      (ern--merge-draw-items
        (ern--merge-sort-draw-items head)
        (ern--merge-sort-draw-items right)))))
 
@@ -1516,7 +1513,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
               masked-drawseg (ern--masked-drawseg-next masked-drawseg)
               (ern--draw-item-next item) (ern--scene-draw-item scene)
               (ern--scene-draw-item scene) item)))
-    
+
     (while vissprite
       (let ((item (ern--draw-item-new-from-freelist)))
         (setf (ern--draw-item-scale-fx item)
