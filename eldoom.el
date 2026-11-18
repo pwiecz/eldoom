@@ -150,7 +150,7 @@ With an interactive prefix argument, prompt for FRAMES."
       (eldoom-special-update)
       (eldoom-render-render-level
        ewd-current-map scene canvas x-fx y-fx z-fx
-       (eldoom--thing-angle-bam player-start) nil)
+       (eldoom--thing-angle-bam player-start) nil 0)
       (cl-incf eldoom-globals-level-time)
       (cl-incf eldoom-globals-game-tic))
     (garbage-collect)
@@ -161,7 +161,7 @@ With an interactive prefix argument, prompt for FRAMES."
       (eldoom-special-update)
       (eldoom-render-render-level
        ewd-current-map scene canvas x-fx y-fx z-fx
-       (eldoom--thing-angle-bam player-start) nil)
+       (eldoom--thing-angle-bam player-start) nil 0)
       (cl-incf eldoom-globals-level-time)
       (cl-incf eldoom-globals-game-tic))
     (setq elapsed (- (float-time) started-at))
@@ -215,9 +215,9 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
       (eldoom-special-update)
       (let ((player-mobj (emo-player-mobj eldoom-player)))
         (eldoom-render-render-level map scene canvas
-                                       (emo-x-fx player-mobj) (emo-y-fx player-mobj)
-                                       (emo-z-fx player-mobj) (emo-angle player-mobj)
-                                       nil))
+                                    (emo-x-fx player-mobj) (emo-y-fx player-mobj)
+                                    (emo-z-fx player-mobj) (emo-angle player-mobj)
+                                    nil 0))
       (cl-incf eldoom-globals-level-time)
       (cl-incf eldoom-globals-game-tic))
     (garbage-collect)
@@ -230,9 +230,9 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
       (eldoom-special-update)
       (let ((player-mobj (emo-player-mobj eldoom-player)))
         (eldoom-render-render-level map scene canvas
-                                       (emo-x-fx player-mobj) (emo-y-fx player-mobj)
-                                       (emo-z-fx player-mobj) (emo-angle player-mobj)
-                                       nil))
+                                    (emo-x-fx player-mobj) (emo-y-fx player-mobj)
+                                    (emo-z-fx player-mobj) (emo-angle player-mobj)
+                                    nil 0))
       (cl-incf eldoom-globals-level-time)
       (cl-incf eldoom-globals-game-tic))
     (profiler-stop)
@@ -295,7 +295,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
             (eldoom-render-render-level
              map scene eldoom-canvas
              (emo-x-fx player-mobj) (emo-y-fx player-mobj)
-             (emo-player-view-z eldoom-player) (emo-angle player-mobj) nil)
+             (emo-player-view-z eldoom-player) (emo-angle player-mobj) nil 0)
             (setq max-render-time (max (- (float-time) started-at)))
             (when (= 0 (% eldoom-globals-level-time 20))
               (message "eldoom-test-bsp render: %.3fs" max-render-time)
@@ -304,7 +304,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
             (redisplay t))
           (cl-incf eldoom-globals-level-time)
           (cl-incf eldoom-globals-game-tic))
-      (quit 
+      (quit
        (eldoom-quit)))))
 
 (defun eldoom-bsp-no-display ()
@@ -326,12 +326,17 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
          (render-angle-bam (eldoom--thing-angle-bam player-start)))
     (setq eldoom-globals-level-time 0
           eldoom-globals-game-tic 255)
-    (let ((time (car (benchmark-run 1 
+    (let ((time (car (benchmark-run 1
                        (dotimes (_ 1000)
-                         (let* ((offset-fx (eldoom-math-fixed-from-float (* 96.0 (sin (/ eldoom-globals-level-time 24.0)))))
-                                (x-fx (+ start-x-fx (eldoom-math-mul offset-fx (eldoom-math-cos render-angle-bam))))
-                                (y-fx (+ start-y-fx (eldoom-math-mul offset-fx (eldoom-math-sin render-angle-bam)))))
-                           (eldoom-render-render-level map scene eldoom-canvas x-fx y-fx nil render-angle-bam nil)
+                         (let* ((offset-fx (eldoom-math-fixed-from-float (* 96.0
+                                                                            (sin (/ eldoom-globals-level-time
+                                                                                    24.0)))))
+                                (x-fx (+ start-x-fx (eldoom-math-mul offset-fx
+                                                                     (eldoom-math-cos render-angle-bam))))
+                                (y-fx (+ start-y-fx (eldoom-math-mul offset-fx
+                                                                     (eldoom-math-sin render-angle-bam)))))
+                           (eldoom-render-render-level map scene eldoom-canvas x-fx y-fx nil render-angle-bam
+                                                       nil 0)
                            (cl-incf eldoom-globals-level-time)
                            (cl-incf eldoom-globals-game-tic)))))))
       (message "Rendered 1000 frames in %.3f seconds. Average %.1f FPS" time (/ 1000.0 time)))))
@@ -350,7 +355,8 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
          (z (emo-player-view-z eldoom-player))
          (angle (emo-angle player-mobj)))
     (eldoom-render-render-level map scene canvas x y z angle
-                                   (emo-player-fixed-colormap eldoom-player))))
+                                (emo-player-fixed-colormap eldoom-player)
+                                (emo-player-extra-light eldoom-player))))
 
 (defun eldoom-move-forward (fast)
   (interactive)
@@ -369,17 +375,17 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
 
 (defun eldoom-turn-right (fast)
   (interactive)
-  (cl-decf (eldoom-user-command-angle-turn eldoom-cmd) 
+  (cl-decf (eldoom-user-command-angle-turn eldoom-cmd)
            (if fast eldoom-player-turn-fast-bam eldoom-player-turn-bam)))
 
 (defun eldoom-strafe-left (fast)
   (interactive)
-  (cl-decf (eldoom-user-command-side-move eldoom-cmd) 
+  (cl-decf (eldoom-user-command-side-move eldoom-cmd)
            (if fast eldoom-player-strafe-speed-fast eldoom-player-strafe-speed)))
 
 (defun eldoom-strafe-right (fast)
   (interactive)
-  (cl-incf (eldoom-user-command-side-move eldoom-cmd) 
+  (cl-incf (eldoom-user-command-side-move eldoom-cmd)
            (if fast eldoom-player-strafe-speed-fast eldoom-player-strafe-speed)))
 
 (defun eldoom-use ()
@@ -442,7 +448,7 @@ Used while the blocking game loop runs and another buffer is focused."
                       ((equal keys [M-down]) (eldoom-move-backward t))
                       ((equal keys [prior]) (eldoom-strafe-left t))
                       ((equal keys [next]) (eldoom-strafe-right t))
-                      
+
                       ((equal keys [?\C-g]) (keyboard-quit))
                       (t
                        (let ((cmd (key-binding keys)))
@@ -510,7 +516,7 @@ Used while the blocking game loop runs and another buffer is focused."
                    (eldoom--render-view ewd-current-map scene eldoom-canvas)
                    (setq max-render-time (max max-render-time (- (float-time) render-start)))
                    (when (zerop (% eldoom-globals-level-time 20))
-                     (message "eldoom render: %.3fs %d,%d" max-render-time 
+                     (message "eldoom render: %.3fs %d,%d" max-render-time
                               (emo-x-fx (emo-player-mobj eldoom-player))
                               (emo-y-fx (emo-player-mobj eldoom-player)))
                      (setq max-render-time 0))
