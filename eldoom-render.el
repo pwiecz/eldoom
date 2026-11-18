@@ -55,7 +55,8 @@ This is the BAM analogue of normalising an angle into (-pi, pi]."
   drawseg
   draw-item
   sky-texture
-  fixed-colormap)
+  fixed-colormap
+  extra-light)
 
 (cl-defstruct (ern--visplane
                (:constructor ern--make-visplane)
@@ -68,6 +69,7 @@ This is the BAM analogue of normalising an angle into (-pi, pi]."
   (max-x 0 :type fixnum)         ;; Ending screen column
   (top-vector (make-vector eldoom-canvas-width 0) :type array) ;; Array of top Y-bounds per column
   (bottom-vector (make-vector eldoom-canvas-width 0) :type array) ;; Array of bottom Y-bounds per column
+  (extra-light 0 :type fixnum)   ;; Light adjustment from e.g. muzzle flash
   next)                          ;; Next visplane in a linked list
 
 (define-eldoom-intrusive-freelist eldoom-render--visplane
@@ -142,10 +144,12 @@ Part of R_ProjectSprite in r_things.c"
 (cl-defstruct (ern--masked-drawseg
                (:constructor ern--make-masked-drawseg)
                (:copier nil))
+  scene
   column-start
   column-end
   texture
-  colormap
+  (sector-light 0 :type fixnum)
+  (light-adjust 0 :type fixnum)
   near-floor
   far-floor
   near-ceiling
@@ -224,10 +228,12 @@ Part of R_ProjectSprite in r_things.c"
                                         (aref ds-bot-array c)))))))))))
       (setq drawseg (ern--drawseg-next drawseg)))))
 
-(defsubst ern--wall-light-adjust (_seg)
-  ;; Doom applies a small fake contrast boost/cut for cardinal walls.
-  ;; TODO: reimplement it based on the seg orientation.
-  0)
+(defsubst ern--wall-light-adjust (seg)
+  (let ((segment (ewd-seg-segment seg)))
+    (cond
+     ((= (eldoom-math-segment-y1 segment) (eldoom-math-segment-y2 segment)) -1)
+     ((= (eldoom-math-segment-x1 segment) (eldoom-math-segment-x2 segment)) 1)
+     (t 0))))
 
 (defun ern--find-active-visplane (scene x height texture light ceiling-p)
   "Find a matching visplane that is not already active in column X."
@@ -267,7 +273,8 @@ Part of R_ProjectSprite in r_things.c"
               (ern--visplane-light vp) light
               (ern--visplane-ceiling-p vp) ceiling-p
               (ern--visplane-min-x vp) x
-              (ern--visplane-max-x vp) x))
+              (ern--visplane-max-x vp) x
+              (ern--visplane-extra-light vp) (ern--scene-extra-light scene)))
       (setf (ern--visplane-min-x vp) (min (ern--visplane-min-x vp) x)
             (ern--visplane-max-x vp) (max (ern--visplane-max-x vp) x))
       (let ((top-vec (ern--visplane-top-vector vp))
@@ -278,15 +285,6 @@ Part of R_ProjectSprite in r_things.c"
 ;; Texture to use in place of a missing texture.
 (defconst ern--fallback-color 251) ; pink
 (defconst ern--fallback-texture (ewd-make-texture-from-color ern--fallback-color))
-
-(defsubst ern--wall-lightmap-index-fx (light distance-int light-adjust)
-  "Calculate the lightmap index using integer distance."
-  (declare (ftype (function (fixnum fixnum fixnum) fixnum)))
-  (let* ((adjusted-light (eldoom-math-clamp (+ light light-adjust) 0 255))
-         (sector-level (ash adjusted-light -4))
-         (light-index (* (- 15 sector-level) 2))
-         (distance-index (/ distance-int 192)))
-    (eldoom-math-clamp (+ light-index distance-index) 0 31)))
 
 (defsubst ern--pack-span (start end)
   (logior (ash start 16) end))
@@ -598,13 +596,35 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                            (setq y (1+ y)
                                  offset (+ offset stride))))))))))))
 
-(defun ern--find-visplane-colormap (scene sector-light distance-fx)
+
+(defsubst ern--column-lightmap-index-fx (sector-light scale light-adjust)
+  "Calculate the lightmap index for column with given vertical scale."
+  (declare (ftype (function (fixnum fixnum fixnum) fixnum)))
+  (let* ((adjusted-light (eldoom-math-clamp (+ (ash sector-light -3)
+                                               (ash light-adjust 1))
+                                            0 31))
+         (scale-index (eldoom-math-clamp (ash scale -12) 0 47))
+         (start-map (* (- 31 adjusted-light) 2))
+         (light-index (- start-map scale-index)))
+    (eldoom-math-clamp light-index 0 31)))
+
+(defsubst ern--visplane-lightmap-index-fx (sector-light distance-fx light-adjust)
+  "Calculate the lightmap for visplane row with given depth."
+  (declare (ftype (function (fixnum fixnum fixnum) fixnum)))
+  (let* ((adjusted-light (eldoom-math-clamp (+ (ash sector-light -3)
+                                               (ash light-adjust 1))
+                                            0 31))
+         (z-index (eldoom-math-clamp (ash distance-fx -20) 0 127))
+         (start-map (* (- 31 adjusted-light) 2))
+         (z-bonus (/ 160 (1+ z-index) 2)))
+    (eldoom-math-clamp (- start-map z-bonus) 0 31)))
+
+(defun ern--find-visplane-colormap (scene sector-light distance-fx light-adjust)
   (let* ((fixed-colormap (ern--scene-fixed-colormap scene)))
     (if fixed-colormap
         fixed-colormap
       (let* ((colormaps (ern--scene-colormaps scene))
-             (distance-int (eldoom-math-fixed-to-int distance-fx))
-             (lightmap-index (ern--wall-lightmap-index-fx sector-light distance-int 0)))
+             (lightmap-index (ern--visplane-lightmap-index-fx sector-light distance-fx light-adjust)))
         (aref colormaps lightmap-index)))))
 
 (defun ern--draw-visplanes
@@ -641,6 +661,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
 
             (let* ((flat-data (ewd-flat-data flat))
                    (light (ern--visplane-light vp))
+                   (extra-light (ern--visplane-extra-light vp))
                    (ceiling-p (ern--visplane-ceiling-p vp))
                    (plane-height (if ceiling-p
                                      (- (ern--visplane-height vp) view-z)
@@ -675,7 +696,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                       (let* ((yslope-fx (eldoom-math-div center-x-fx denom-fx))
                              (distance-fx (eldoom-math-mul plane-height-fx yslope-fx))
                              (colormap (ern--find-visplane-colormap scene light 
-                                                                    distance-fx))
+                                                                    distance-fx extra-light))
                              (fx-step (eldoom-math-mul distance-fx (eldoom-math-div sin-fx projection-plane)))
                              (fy-step (eldoom-math-mul distance-fx (eldoom-math-div cos-fx projection-plane)))
                              (x min-x))
@@ -880,15 +901,15 @@ ANGLE and HALF-FOV are BAM angles."
               (ern--ray-intersect-aabb-p x-fx y-fx right-ray-dx right-ray-dy top-fx bottom-fx left-fx right-fx)))))))
 
 (defun ern--find-vissprite-colormap (mobj sector-light scale-fx fixed-colormap
-                                          colormaps)
+                                          colormaps light-adjust)
   (cond
    ;; ((eldoom-math-has-flag (emo-flags mobj) enf-MF_SHADOW)
    ;; TODO: handle shadow draws
    (fixed-colormap fixed-colormap)
    ((enf-state-fullbright (emo-state mobj)) (aref colormaps 0))
    (t   
-    (let* ((distance-int (/ eldoom-math-unit (max 1 scale-fx)))
-           (lightmap-index (ern--wall-lightmap-index-fx sector-light distance-int 0)))
+    (let* (;;(distance-int (/ eldoom-math-unit (max 1 scale-fx)))
+           (lightmap-index (ern--column-lightmap-index-fx sector-light scale-fx light-adjust)))
       (aref colormaps lightmap-index)))))
 
 (defun ern--try-queue-vissprite
@@ -897,7 +918,10 @@ ANGLE and HALF-FOV are BAM angles."
   (let* ((projection-plane (ern--scene-projection-plane scene))
          (colormaps (ern--scene-colormaps scene))
          (center-x-fx (ern--scene-center-x scene))
-         (center-y-fx (ern--scene-center-y scene)))
+         (center-y-fx (ern--scene-center-y scene))
+         (fixed-colormap (ern--scene-fixed-colormap scene))
+         (extra-light (ern--scene-extra-light scene))
+         (light (ewd-sector-light sector)))
     (let* ((tx-fx (emo-x-fx mobj))
            (ty-fx (emo-y-fx mobj))
            (tr-x-fx (- tx-fx x-fx))
@@ -927,10 +951,8 @@ ANGLE and HALF-FOV are BAM angles."
                        (<= x1 (1- eldoom-canvas-width))
                        (>= x2 0))
               (let* ((thing-z (eldoom-math-fixed-to-int (emo-z-fx mobj)))
-                     (light (ewd-sector-light sector))
-                     (fixed-colormap (ern--scene-fixed-colormap scene))
                      (colormap (ern--find-vissprite-colormap mobj light scale-fx
-                                                             fixed-colormap colormaps))
+                                                             fixed-colormap colormaps extra-light))
                      ;; top-y = center - (thing-z + y-offset - view-z) * scale
                      (top-y-fx (- center-y-fx
                                   (* (- (+ thing-z patch-y-offset) view-z) scale-fx)))
@@ -1014,14 +1036,15 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
           (aref animation frame))
       texture)))
 
-(defun ern--find-masked-drawseg-colormap (scene sector scale-fx light-adjust)
+(defun ern--find-drawseg-colormap (scene sector-light scale-fx light-adjust)
+  (declare (ftype (function (ern--scene fixnum fixnum) array)))
   (let* ((fixed-colormap (ern--scene-fixed-colormap scene)))
     (if fixed-colormap
         fixed-colormap
       (let* ((colormaps (ern--scene-colormaps scene))
-             (light (ewd-sector-light sector))
-             (projection-plane (ern--scene-projection-plane scene))
-             (colormap-index (ern--wall-lightmap-index-fx light (/ projection-plane (max 1 scale-fx)) light-adjust)))
+             ;;(projection-plane (ern--scene-projection-plane scene))
+             (colormap-index (ern--column-lightmap-index-fx sector-light scale-fx;;(/ projection-plane (max 1 scale-fx))
+                                                            light-adjust)))
         (aref colormaps colormap-index)))))
 
 (defun ern--draw-candidate-projected
@@ -1052,7 +1075,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                                (eldoom-math-fixed-to-int (ewd-sector-ceiling-height-fx far-sector))))
          (upper-texture (ern--animated-texture (ewd-sidedef-upper sidedef)))
          (lower-texture (ern--animated-texture (ewd-sidedef-lower sidedef)))
-         (light-adjust (ern--wall-light-adjust seg))
+         (light-adjust (+ (ern--wall-light-adjust seg) (ern--scene-extra-light scene)))
          (texture-y-offset (ewd-sidedef-y sidedef))
          (segment (ewd-seg-segment seg))
          (x1-fx (eldoom-math-segment-x1 segment))
@@ -1132,10 +1155,6 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                      (fc-y-step-fx (when k-far-ceil (* k-far-ceil scale-step-fx)))
                      (ff-y-step-fx (when k-far-floor (* k-far-floor scale-step-fx)))
                      (column start-column)
-                     ;; TODO: colormap should probably vary by column.
-                     (colormap (ern--find-masked-drawseg-colormap scene near-sector
-                                                                  scale-start-fx
-                                                                  light-adjust))
                      (wall-type (if far-sector 'portal 'solid))
                      ;; Drawseg scale bounds for later sprite clipping.
                      (ds-scale1-fx scale1-fx)
@@ -1147,10 +1166,12 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                   (let ((drawseg (ern--masked-drawseg-new-from-freelist)))
                     (setf (ern--masked-drawseg-next drawseg) (ern--scene-masked-drawseg scene)
                           (ern--scene-masked-drawseg scene) drawseg
+                          (ern--masked-drawseg-scene drawseg) scene
+                          (ern--masked-drawseg-sector-light drawseg) (ewd-sector-light near-sector)
+                          (ern--masked-drawseg-light-adjust drawseg) light-adjust
                           (ern--masked-drawseg-column-start drawseg) start-column
                           (ern--masked-drawseg-column-end drawseg) end-column
                           (ern--masked-drawseg-texture drawseg) middle-texture
-                          (ern--masked-drawseg-colormap drawseg) colormap
                           (ern--masked-drawseg-near-floor drawseg) near-floor-height
                           (ern--masked-drawseg-far-floor drawseg) far-floor-height
                           (ern--masked-drawseg-near-ceiling drawseg) near-ceiling-height
@@ -1183,7 +1204,9 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                     ;; perpendicular distance, no perspective division.
                     (let ((tex-x-fx (ern--texturecolumn-fx
                                      rw-offset-fx rw-distance-fx rw-centerangle
-                                     (aref xtoviewangle column))))
+                                     (aref xtoviewangle column)))
+                          (colormap (ern--find-drawseg-colormap scene (ewd-sector-light near-sector)
+                                                                scale-start-fx light-adjust)))
                       
                       (ern--draw-projected-column-clipped-fx
                        scene bitmap data-offset
@@ -1357,10 +1380,12 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
 (defun ern--draw-masked-drawseg
     (drawseg bitmap data-offset view-z center-y-fx palette xtoviewangle)
   "Draw one queued transparent middle-texture wall segment."
-  (let* ((texture (ern--masked-drawseg-texture drawseg))
+  (let* ((scene (ern--masked-drawseg-scene drawseg))
+         (texture (ern--masked-drawseg-texture drawseg))
+         (sector-light (ern--masked-drawseg-sector-light drawseg))
+         (light-adjust (ern--masked-drawseg-light-adjust drawseg))
          (start-column (ern--masked-drawseg-column-start drawseg))
          (end-column (ern--masked-drawseg-column-end drawseg))
-         (colormap (ern--masked-drawseg-colormap drawseg))
          (near-floor (ern--masked-drawseg-near-floor drawseg))
          (far-floor (ern--masked-drawseg-far-floor drawseg))
          (near-ceiling (ern--masked-drawseg-near-ceiling drawseg))
@@ -1402,7 +1427,8 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                         (final-clip-top (max clip-top portal-clip-top))
                         (final-clip-bottom (min clip-bottom portal-clip-bottom))
                         (draw-start (max final-clip-top (eldoom-math-fixed-ceil tex-top-y-fx)))
-                        (draw-end (min final-clip-bottom (eldoom-math-fixed-to-int tex-bottom-y-fx))))
+                        (draw-end (min final-clip-bottom (eldoom-math-fixed-to-int tex-bottom-y-fx)))
+                        (colormap (ern--find-drawseg-colormap scene sector-light scale light-adjust)))
                    (when (<= draw-start draw-end)
                      (let* ((denom-fx (max 1 (- tex-bottom-y-fx tex-top-y-fx)))
                             (step-fx (eldoom-math-div (eldoom-math-fixed-from-int texture-height) denom-fx))
@@ -1513,9 +1539,9 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
           (setq item (ern--draw-item-next item)))))))
 
 (defun ern-render-level
-    (map scene canvas x-fx y-fx z-fx angle-bam fixed-colormap)
+    (map scene canvas x-fx y-fx z-fx angle-bam fixed-colormap extra-light)
   "Render MAP onto CANVAS using Doom's BSP strictly front-to-back."
-  (declare (ftype (function (t t array fixnum fixnum fixnum fixnum t) t)))
+  (declare (ftype (function (t t array fixnum fixnum fixnum fixnum t fixnum) t)))
   (let* ((width eldoom-canvas-width)
          (height eldoom-canvas-height)
          (bitmap (eldoom-canvas-bitmap canvas))
@@ -1531,7 +1557,8 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
     (ern--clear-vissprites scene)
     (ern--clear-drawsegs scene)
     (ern--clear-draw-items scene)
-    (setf (ern--scene-fixed-colormap scene) fixed-colormap)
+    (setf (ern--scene-fixed-colormap scene) fixed-colormap
+          (ern--scene-extra-light scene) extra-light)
     (eldoom-math-set-view-transformation (ern--scene-view-transformation scene)
                                          x-fx y-fx z-fx
                                          angle-bam)
