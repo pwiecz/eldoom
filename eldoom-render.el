@@ -1030,7 +1030,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
       texture)))
 
 (defun ern--find-drawseg-colormap (scene sector-light scale-fx light-adjust)
-  (declare (ftype (function (ern--scene fixnum fixnum) array)))
+  (declare (ftype (function (ern--scene fixnum fixnum fixnum) array)))
   (let* ((fixed-colormap (ern--scene-fixed-colormap scene)))
     (if fixed-colormap
         fixed-colormap
@@ -1571,10 +1571,10 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                 (state (eldoom-user-sprite-state flash-sprite)))
       (ern--draw-player-sprite scene bitmap data-offset palette flash-sprite state sector-light player))))
 
-(defun ern-render-level
-    (map scene canvas x-fx y-fx z-fx angle-bam player)
+(defun ern-render-level (map scene canvas x-fx y-fx z-fx angle-bam player)
   "Render MAP onto CANVAS using Doom's BSP strictly front-to-back."
-  (declare (ftype (function (t t array fixnum fixnum fixnum fixnum t fixnum) t)))
+  (declare (ftype (function (ewd-map ern--scene array fixnum fixnum fixnum fixnum emo-player)
+                            t)))
   (let* ((width eldoom-canvas-width)
          (height eldoom-canvas-height)
          (bitmap (eldoom-canvas-bitmap canvas))
