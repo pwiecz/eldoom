@@ -1531,37 +1531,34 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
             (ern--draw-vissprite item-obj drawseg bitmap data-offset palette))
           (setq item (ern--draw-item-next item)))))))
 
-(defconst ern--psprite-scale eldoom-math-unit)
-(defconst ern--psprite-iscale eldoom-math-unit)
-
 (defun ern--draw-player-sprite (scene bitmap data-offset palette psprite state sector-light player)
   "R_DrawPSprite in r_things.c"
   (let* ((sprite (enf-state-sprite state))
          (patch (aref (aref sprite (enf-state-frame state)) 0))
          (width (eldoom-math-fixed-from-int (ewd-patch-width patch)))
          (center-x (ern--scene-center-x scene))
-         (tx (- (eldoom-user-sprite-sx psprite) (eldoom-math-fixed-from-int 160)))
-         (x1 (eldoom-math-fixed-to-int (+ center-x (eldoom-math-mul tx ern--psprite-scale))))
-         (x2 (1- (eldoom-math-fixed-to-int (+ center-x (eldoom-math-mul (+ tx width) ern--psprite-scale)))))
-         (y (- (+ (eldoom-math-fixed-from-int 100) (/ eldoom-math-unit 2) (/ (ewd-patch-y-offset patch) 2))
+         (tx (- (eldoom-user-sprite-sx psprite) (ewd-patch-x-offset patch) (/ width 2)))
+         (x1 (eldoom-math-fixed-to-int (+ center-x tx)))
+         (x2 (1- (eldoom-math-fixed-to-int (+ center-x tx width))))
+         (y (+ (eldoom-math-fixed-from-int (- eldoom-canvas-height (ewd-patch-height patch)))
+               (/ eldoom-math-unit 2) (/ (ewd-patch-y-offset patch) 2)
                (eldoom-user-sprite-sy psprite)))
-         (drawseg (ern--scene-drawseg scene))
          (colormaps (ern--scene-colormaps scene))
          (fixed-colormap (emo-player-fixed-colormap player))
          (extra-light (emo-player-extra-light player))
-         (colormap (ern--find-vissprite-colormap state sector-light ern--psprite-scale fixed-colormap colormaps
+         (colormap (ern--find-vissprite-colormap state sector-light eldoom-math-unit fixed-colormap colormaps
                                                  extra-light))
          (vissprite (ern--vissprite-new-from-freelist)))
-  (when (and (<= x1 320) (>= x2 0))
-    (setf (ern--vissprite-x1 vissprite) (max x1 0)
-          (ern--vissprite-x2 vissprite) (min x2 319)
-          (ern--vissprite-scale-fx vissprite) eldoom-math-unit
-          (ern--vissprite-texture-x-fx vissprite) 0 ;; TODO set it
-          (ern--vissprite-patch vissprite) patch
-          (ern--vissprite-colormap vissprite) colormap
-          (ern--vissprite-mobj-z vissprite) 0
-          (ern--vissprite-texture-y-fx vissprite) y) ;; TODO set it
-    (ern--draw-vissprite vissprite drawseg bitmap data-offset palette))))
+    (when (and (<= x1 eldoom-canvas-width) (>= x2 0))
+      (setf (ern--vissprite-x1 vissprite) x1
+            (ern--vissprite-x2 vissprite) x2
+            (ern--vissprite-scale-fx vissprite) eldoom-math-unit
+            (ern--vissprite-texture-x-fx vissprite) x1
+            (ern--vissprite-patch vissprite) patch
+            (ern--vissprite-colormap vissprite) colormap
+            (ern--vissprite-mobj-z vissprite) 0
+            (ern--vissprite-texture-y-fx vissprite) y)
+      (ern--draw-vissprite vissprite nil bitmap data-offset palette))))
 
 (defun ern--draw-player-sprites (scene bitmap data-offset palette player)
   (let* ((sector (ewd-subsector-sector (emo-subsector (emo-player-mobj player))))
