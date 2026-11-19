@@ -1553,9 +1553,6 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
          (colormap (ern--find-vissprite-colormap state sector-light ern--psprite-scale fixed-colormap colormaps
                                                  extra-light))
          (vissprite (ern--vissprite-new-from-freelist)))
-    (eldoom-user-sprite-sx psprite) (eldoom-user-sprite-sy psprite)
-    x1 x2 (eldoom-math-fixed-to-int tx) (eldoom-math-fixed-to-int center-x)
-    (eldoom-math-fixed-to-int y))
   (when (and (<= x1 320) (>= x2 0))
     (setf (ern--vissprite-x1 vissprite) (max x1 0)
           (ern--vissprite-x2 vissprite) (min x2 319)
