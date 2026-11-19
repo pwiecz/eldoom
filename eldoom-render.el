@@ -111,9 +111,9 @@ Part of R_ProjectSprite in r_things.c"
   (x2 0 :type fixnum)         ;; Rightmost screen column of the wall
   (scale1-fx 0 :type fixnum)  ;; Fixed-point depth scale at x1
   (scale2-fx 0 :type fixnum)  ;; Fixed-point depth scale at x2
-  type                        ;; Symbol: 'solid or 'portal
-  (top-clip-array (make-vector eldoom-canvas-width 0) :type array) ;; Only used if 'portal
-  (bottom-clip-array (make-vector eldoom-canvas-width 0) :type array) ;; Only used if 'portal
+  type                        ;; Symbol: :solid or :portal
+  (top-clip-array (make-vector eldoom-canvas-width 0) :type array) ;; Only used if :portal
+  (bottom-clip-array (make-vector eldoom-canvas-width 0) :type array) ;; Only used if :portal
   next)
 
 (define-eldoom-intrusive-freelist eldoom-render--drawseg
@@ -135,7 +135,7 @@ Part of R_ProjectSprite in r_things.c"
 
     ;; If it is a portal (window/step), we must save the silhouette limits
     ;; exactly as they were BEFORE this wall mutated them.
-    (when (eq type 'portal)
+    (when (eq type :portal)
       (let ((ds-top (ern--drawseg-top-clip-array ds))
             (ds-bot (ern--drawseg-bottom-clip-array ds)))
         (cl-loop for c from x1 to x2 do
@@ -202,7 +202,7 @@ Part of R_ProjectSprite in r_things.c"
                  (ds-span (- ds-x2 ds-x1))
                  (ds-dscale (- ds-scale2 ds-scale1)))
 
-            (if (eq (ern--drawseg-type drawseg) 'solid)
+            (if (eq (ern--drawseg-type drawseg) :solid)
                 ;; Solid Wall Clipping
                 (cl-loop for c from clip-start to clip-end do
                          ;; Interpolate wall scale specifically for this column
@@ -300,33 +300,29 @@ Part of R_ProjectSprite in r_things.c"
       (aset bitmap (+ offset 2) (aref color 2)))))
 
 (defun ern--draw-column-span
-    (bitmap data-offset column draw-start draw-end
-            texture-column tex-y-fx tex-y-step-fx
-            colormap palette texture-height
-            validate-range-p)
+    (bitmap data-offset column draw-start draw-end texture-column tex-y-fx tex-y-step-fx
+            colormap palette texture-height wrap-p)
   "Draw one vertical column span (Doom R_DrawColumn / R_DrawMaskedColumn).
 TEXTURE-COLUMN is a height-sized vector of palette indices (nil = transparent).
-When VALIDATE-RANGE-P, sample only rows in [0, TEXTURE-HEIGHT) and skip nil.
-Otherwise wrap with TEXTURE-HEIGHT."
-  (declare (ftype (function ( array fixnum fixnum fixnum fixnum
-                              array fixnum fixnum
-                              array array fixnum
-                              boolean) t)))
+When WRAP-P, wrap with TEXTURE-HEIGHT.
+Otherwise sample only rows in [0, TEXTURE-HEIGHT) and skip nil."
+  (declare (ftype (function ( array fixnum fixnum fixnum fixnum array fixnum fixnum
+                              array array fixnum boolean) t)))
   (let ((offset (+ data-offset (* 3 (+ column (* draw-start eldoom-canvas-width)))))
         (stride (* 3 eldoom-canvas-width))
         (y draw-start))
-    (if validate-range-p
+    (if wrap-p
         (while (<= y draw-end)
-          (let ((tex-y-int (eldoom-math-fixed-to-int tex-y-fx)))
-            (when (and (>= tex-y-int 0) (< tex-y-int texture-height))
-              (ern--draw-pixel bitmap offset (aref texture-column tex-y-int) colormap palette)))
+          (ern--draw-pixel bitmap offset
+                           (aref texture-column (mod (eldoom-math-fixed-to-int tex-y-fx) texture-height))
+                           colormap palette)
           (setq y (1+ y)
                 tex-y-fx (+ tex-y-fx tex-y-step-fx)
                 offset (+ offset stride)))
       (while (<= y draw-end)
-        (ern--draw-pixel bitmap offset
-                         (aref texture-column (mod (eldoom-math-fixed-to-int tex-y-fx) texture-height))
-                         colormap palette)
+        (let ((tex-y-int (eldoom-math-fixed-to-int tex-y-fx)))
+          (when (and (>= tex-y-int 0) (< tex-y-int texture-height))
+            (ern--draw-pixel bitmap offset (aref texture-column tex-y-int) colormap palette)))
         (setq y (1+ y)
               tex-y-fx (+ tex-y-fx tex-y-step-fx)
               offset (+ offset stride))))))
@@ -338,20 +334,20 @@ Otherwise wrap with TEXTURE-HEIGHT."
 On two-sided lines ML_DONTPEGTOP/ML_DONTPEGBOTTOM control upper/lower textures;
 the same bits select middle-texture pegging on masked midtextures.  On one-sided
 lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
-  (pcase wall-role
-    ('solid
+  (cl-ecase wall-role
+    (:solid
      (if lower-unpegged-p
          (+ near-floor texture-height)
        near-ceiling))
-    ('upper
+    (:upper
      (if upper-unpegged-p
          near-ceiling
        (+ far-ceiling texture-height)))
-    ('lower
+    (:lower
      (if lower-unpegged-p
          near-ceiling
        far-floor))
-    ('middle-portal
+    (:middle-portal
      (if lower-unpegged-p
          (+ (max near-floor far-floor) texture-height)
        (if upper-unpegged-p
@@ -362,11 +358,11 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
     (bitmap data-offset column clip-top clip-bottom
             wall-top-y-fx wall-bottom-y-fx world-top-z texture-height
             texture tex-x-fx texture-y-offset colormap palette
-            view-z center-y-fx scale-fx &optional masked-p)
+            view-z center-y-fx scale-fx)
   (declare (ftype (function (array fixnum fixnum fixnum fixnum
                                    fixnum fixnum fixnum fixnum
                                    t fixnum fixnum t t
-                                   fixnum fixnum fixnum &optional t) t)))
+                                   fixnum fixnum fixnum) t)))
   (let* ((tex-top-y-fx (+ center-y-fx (* (- view-z world-top-z) scale-fx)))
          (tex-bottom-y-fx (+ center-y-fx
                              (* (- view-z (- world-top-z texture-height)) scale-fx)))
@@ -376,16 +372,16 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
          (clip-end (min clip-bottom wall-end)))
     (when (<= clip-start clip-end)
       (let* ((denom-fx (max 1 (- tex-bottom-y-fx tex-top-y-fx)))
-             (texture-width (cl-the fixnum (ewd-texture-width texture)))
-             (texture-column (cl-the array (aref (ewd-texture-columns texture)
-                                                 (mod (eldoom-math-fixed-to-int tex-x-fx) texture-width))))
+             (texture-width (ewd-texture-width texture))
+             (texture-column (aref (ewd-texture-columns texture)
+                                   (mod (eldoom-math-fixed-to-int tex-x-fx) texture-width)))
              (step-fx (eldoom-math-div (eldoom-math-fixed-from-int texture-height) denom-fx))
              (tex-y-fx (+ (eldoom-math-fixed-from-int texture-y-offset)
                           (eldoom-math-mul (- (eldoom-math-fixed-from-int clip-start) tex-top-y-fx) step-fx))))
         (ern--draw-column-span
          bitmap data-offset column clip-start clip-end
          texture-column tex-y-fx step-fx colormap palette texture-height
-         masked-p))
+         t))
       (ern--pack-span clip-start clip-end))))
 
 (defsubst ern--draw-wall-span-clipped-fx
@@ -480,7 +476,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                  bitmap data-offset column
                  nc-y-fx nf-y-fx middle-texture colormap palette
                  tex-x-fx texture-y-offset
-                 clip-top clip-bottom 'solid
+                 clip-top clip-bottom :solid
                  upper-unpegged-p lower-unpegged-p
                  near-ceiling near-floor nil nil
                  view-z center-y-fx scale-fx)
@@ -497,7 +493,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                        bitmap data-offset column
                        nc-y-fx fc-y-fx upper-texture colormap palette
                        tex-x-fx texture-y-offset
-                       clip-top clip-bottom 'upper
+                       clip-top clip-bottom :upper
                        upper-unpegged-p lower-unpegged-p
                        near-ceiling near-floor far-ceiling far-floor
                        view-z center-y-fx scale-fx))
@@ -518,7 +514,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                      bitmap data-offset column
                      ff-y-fx nf-y-fx lower-texture colormap palette
                      tex-x-fx texture-y-offset
-                     clip-top clip-bottom 'lower
+                     clip-top clip-bottom :lower
                      upper-unpegged-p lower-unpegged-p
                      near-ceiling near-floor far-ceiling far-floor
                      view-z center-y-fx scale-fx)
@@ -538,7 +534,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                                     bitmap data-offset column
                                     nc-y-fx nf-y-fx middle-texture colormap palette
                                     tex-x-fx texture-y-offset
-                                    clip-top clip-bottom 'middle-portal
+                                    clip-top clip-bottom :middle-portal
                                     upper-unpegged-p lower-unpegged-p
                                     near-ceiling near-floor far-ceiling far-floor
                                     view-z center-y-fx scale-fx)))
@@ -1150,7 +1146,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                      (fc-y-step-fx (when k-far-ceil (* k-far-ceil scale-step-fx)))
                      (ff-y-step-fx (when k-far-floor (* k-far-floor scale-step-fx)))
                      (column start-column)
-                     (wall-type (if far-sector 'portal 'solid))
+                     (wall-type (if far-sector :portal :solid))
                      ;; Drawseg scale bounds for later sprite clipping.
                      (ds-scale1-fx scale1-fx)
                      (ds-scale2-fx scale2-fx)
@@ -1357,8 +1353,11 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                                 (let* ((post-y (ewd-patch-post-y-offset post))
                                        (data (ewd-patch-post-data post))
                                        (post-height (length data))
-                                       (screen-y-start (eldoom-math-fixed-to-int (+ top-y-fx (* post-y scale-fx))))
-                                       (screen-y-end (eldoom-math-fixed-to-int (+ top-y-fx (* (+ post-y post-height) scale-fx))))
+                                       (screen-y-start (eldoom-math-fixed-to-int (+ top-y-fx
+                                                                                    (* post-y scale-fx))))
+                                       (screen-y-end (eldoom-math-fixed-to-int (+ top-y-fx
+                                                                                  (* (+ post-y post-height)
+                                                                                     scale-fx))))
 
                                        (draw-y-start (max clip-top-col screen-y-start))
                                        (draw-y-end (min clip-bottom-col (1- screen-y-end))))
@@ -1367,7 +1366,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                                     (ern--draw-column-span
                                      bitmap data-offset column draw-y-start draw-y-end
                                      data (* (- draw-y-start screen-y-start) inv-scale-fx) inv-scale-fx
-                                     colormap palette post-height t))))))))))))
+                                     colormap palette post-height nil))))))))))))
 
 (defun ern--draw-masked-drawseg
     (drawseg bitmap data-offset view-z center-y-fx palette xtoviewangle)
@@ -1403,7 +1402,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                                    rw-offset-fx rw-distance-fx rw-centerangle
                                    (aref xtoviewangle column)))
                         (texture-column (aref texture-columns (mod (eldoom-math-fixed-to-int tex-x-fx) texture-width)))
-                        (world-top-z (ern--texture-world-top-z 'middle-portal upper-unpegged-p lower-unpegged-p
+                        (world-top-z (ern--texture-world-top-z :middle-portal upper-unpegged-p lower-unpegged-p
                                                                near-ceiling near-floor far-ceiling far-floor
                                                                texture-height))
                         (world-bottom-z (- world-top-z texture-height))
@@ -1431,7 +1430,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
                        (ern--draw-column-span
                         bitmap data-offset column draw-start draw-end
                         texture-column tex-y-fx step-fx colormap palette texture-height
-                        t))))))
+                        nil))))))
              (setq scale (+ scale scale-step)))))
 
 (cl-defstruct (ern--draw-item
