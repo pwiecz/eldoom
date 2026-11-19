@@ -1549,6 +1549,7 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
          (colormap (ern--find-vissprite-colormap state sector-light eldoom-math-unit fixed-colormap colormaps
                                                  extra-light))
          (vissprite (ern--vissprite-new-from-freelist)))
+    ;; TODO: still alignment (at least in x-axis) doesn't match Doom exactly.
     (when (and (<= x1 eldoom-canvas-width) (>= x2 0))
       (setf (ern--vissprite-x1 vissprite) x1
             (ern--vissprite-x2 vissprite) x2
