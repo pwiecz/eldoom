@@ -195,7 +195,7 @@ Alternatively specify `:x-fx', `:y-fx', and `:angle-bam' explicitly.")
                                    (plist-get resolved :y-fx)
                                    (plist-get resolved :angle-bam)
                                    (plist-get resolved :z-fx)
-                                   nil 0)
+                                   nil)
     (erg--extract-rgb canvas)))
 
 (defun erg--read-golden (name)

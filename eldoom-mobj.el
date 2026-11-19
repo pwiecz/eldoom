@@ -559,7 +559,7 @@ P_BlockThingsiterator in p_maputl.c"
               (when (= ready-weapon eldoom-globals-wp_fist)
                 (setf (emo-player-pending-weapon player) 
                       (if (aref (emo-player-weapon-owned player) eldoom-globals-wp_chaingun)
-                          eldoom-globals-wp_chainsaw
+                          eldoom-globals-wp_chaingun
                         eldoom-globals-wp_pistol))))
              ((= ammo eldoom-globals-am_shell)
               (when (and (or (= ready-weapon eldoom-globals-wp_fist)

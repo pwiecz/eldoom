@@ -20,6 +20,7 @@
 (require 'eldoom-map)
 (require 'eldoom-math)
 (require 'eldoom-mobj)
+(require 'eldoom-user)
 (require 'eldoom-wad)
 
 (defconst ern--sky-lightmap-index 0)
@@ -311,7 +312,6 @@ Otherwise wrap with TEXTURE-HEIGHT."
                               array fixnum fixnum
                               array array fixnum
                               boolean) t)))
-  ;; (declare (speed 3) (safety 0))
   (let ((offset (+ data-offset (* 3 (+ column (* draw-start eldoom-canvas-width)))))
         (stride (* 3 eldoom-canvas-width))
         (y draw-start))
@@ -367,7 +367,6 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                                    fixnum fixnum fixnum fixnum
                                    t fixnum fixnum t t
                                    fixnum fixnum fixnum &optional t) t)))
-  ;; (declare (speed 3) (safety 0))
   (let* ((tex-top-y-fx (+ center-y-fx (* (- view-z world-top-z) scale-fx)))
          (tex-bottom-y-fx (+ center-y-fx
                              (* (- view-z (- world-top-z texture-height)) scale-fx)))
@@ -633,7 +632,6 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
   "Render all collected visplanes; flats horizontally and skies cylindrically."
   (declare (ftype (function (t array fixnum t
                                fixnum fixnum number number number number) t)))
-  ;; (declare (speed 3) (safety 0))
   (let ((projection-plane (ern--scene-projection-plane scene))
         (sky-texture (ern--scene-sky-texture scene))
         (center-x-fx (ern--scene-center-x scene))
@@ -900,13 +898,13 @@ ANGLE and HALF-FOV are BAM angles."
           (or (ern--ray-intersect-aabb-p x-fx y-fx left-ray-dx left-ray-dy top-fx bottom-fx left-fx right-fx)
               (ern--ray-intersect-aabb-p x-fx y-fx right-ray-dx right-ray-dy top-fx bottom-fx left-fx right-fx)))))))
 
-(defun ern--find-vissprite-colormap (mobj sector-light scale-fx fixed-colormap
-                                          colormaps light-adjust)
+(defun ern--find-vissprite-colormap (state sector-light scale-fx fixed-colormap
+                                           colormaps light-adjust)
   (cond
    ;; ((eldoom-math-has-flag (emo-flags mobj) enf-MF_SHADOW)
    ;; TODO: handle shadow draws
    (fixed-colormap fixed-colormap)
-   ((enf-state-fullbright (emo-state mobj)) (aref colormaps 0))
+   ((enf-state-fullbright state) (aref colormaps 0))
    (t
     (let* ((lightmap-index (ern--column-lightmap-index-fx sector-light scale-fx light-adjust)))
       (aref colormaps lightmap-index)))))
@@ -950,7 +948,7 @@ ANGLE and HALF-FOV are BAM angles."
                        (<= x1 (1- eldoom-canvas-width))
                        (>= x2 0))
               (let* ((thing-z (eldoom-math-fixed-to-int (emo-z-fx mobj)))
-                     (colormap (ern--find-vissprite-colormap mobj light scale-fx
+                     (colormap (ern--find-vissprite-colormap (emo-state mobj) light scale-fx
                                                              fixed-colormap colormaps extra-light))
                      ;; top-y = center - (thing-z + y-offset - view-z) * scale
                      (top-y-fx (- center-y-fx
@@ -1330,8 +1328,6 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
            view-z palette))))))
 
 (defun ern--draw-vissprite (vissprite drawseg bitmap data-offset palette)
-  ;; (declare (speed 3) (safety 0))
-
   ;; Dynamically carve the visibility bounds ---
   (ern--clip-sprite-against-drawsegs vissprite drawseg eldoom-canvas-height)
 
@@ -1344,7 +1340,6 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
          (colormap (ern--vissprite-colormap vissprite))
          (columns (ewd-patch-columns patch))
          (patch-width (ewd-patch-width patch)))
-
     (when (and (> scale-fx 0) columns (<= x1 x2))
       (let ((inv-scale-fx (eldoom-math-div eldoom-math-unit scale-fx)))
         (cl-loop for column from x1 to x2 do
@@ -1534,12 +1529,56 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
               (ern--draw-masked-drawseg
                item-obj bitmap
                data-offset view-z center-y-fx palette xtoviewangle)
-            (ern--draw-vissprite
-             item-obj drawseg bitmap data-offset palette))
+            (ern--draw-vissprite item-obj drawseg bitmap data-offset palette))
           (setq item (ern--draw-item-next item)))))))
 
+(defconst ern--psprite-scale eldoom-math-unit)
+(defconst ern--psprite-iscale eldoom-math-unit)
+
+(defun ern--draw-player-sprite (scene bitmap data-offset palette psprite state sector-light player)
+  "R_DrawPSprite in r_things.c"
+  (let* ((sprite (enf-state-sprite state))
+         (patch (aref (aref sprite (enf-state-frame state)) 0))
+         (width (eldoom-math-fixed-from-int (ewd-patch-width patch)))
+         (center-x (ern--scene-center-x scene))
+         (tx (- (eldoom-user-sprite-sx psprite) (eldoom-math-fixed-from-int 160)))
+         (x1 (eldoom-math-fixed-to-int (+ center-x (eldoom-math-mul tx ern--psprite-scale))))
+         (x2 (1- (eldoom-math-fixed-to-int (+ center-x (eldoom-math-mul (+ tx width) ern--psprite-scale)))))
+         (y (- (+ (eldoom-math-fixed-from-int 100) (/ eldoom-math-unit 2) (/ (ewd-patch-y-offset patch) 2))
+               (eldoom-user-sprite-sy psprite)))
+         (drawseg (ern--scene-drawseg scene))
+         (colormaps (ern--scene-colormaps scene))
+         (fixed-colormap (emo-player-fixed-colormap player))
+         (extra-light (emo-player-extra-light player))
+         (colormap (ern--find-vissprite-colormap state sector-light ern--psprite-scale fixed-colormap colormaps
+                                                 extra-light))
+         (vissprite (ern--vissprite-new-from-freelist)))
+    (eldoom-user-sprite-sx psprite) (eldoom-user-sprite-sy psprite)
+    x1 x2 (eldoom-math-fixed-to-int tx) (eldoom-math-fixed-to-int center-x)
+    (eldoom-math-fixed-to-int y))
+  (when (and (<= x1 320) (>= x2 0))
+    (setf (ern--vissprite-x1 vissprite) (max x1 0)
+          (ern--vissprite-x2 vissprite) (min x2 319)
+          (ern--vissprite-scale-fx vissprite) eldoom-math-unit
+          (ern--vissprite-texture-x-fx vissprite) 0 ;; TODO set it
+          (ern--vissprite-patch vissprite) patch
+          (ern--vissprite-colormap vissprite) colormap
+          (ern--vissprite-mobj-z vissprite) 0
+          (ern--vissprite-texture-y-fx vissprite) y) ;; TODO set it
+    (ern--draw-vissprite vissprite drawseg bitmap data-offset palette))))
+
+(defun ern--draw-player-sprites (scene bitmap data-offset palette player)
+  (let* ((sector (ewd-subsector-sector (emo-subsector (emo-player-mobj player))))
+         (sector-light (ewd-sector-light sector)))
+    (when-let* ((weapon-sprite (emo-player-weapon-sprite player))
+                (state (eldoom-user-sprite-state weapon-sprite)))
+      (ern--draw-player-sprite scene bitmap data-offset palette weapon-sprite state sector-light player))
+    (when-let* ((flash-sprite (emo-player-flash-sprite player))
+                (state (eldoom-user-sprite-state flash-sprite)))
+      (ern--draw-player-sprite scene bitmap data-offset palette flash-sprite state sector-light player))))
+
 (defun ern-render-level
-    (map scene canvas x-fx y-fx z-fx angle-bam fixed-colormap extra-light)
+    (map scene canvas x-fx y-fx z-fx angle-bam player)
   "Render MAP onto CANVAS using Doom's BSP strictly front-to-back."
   (declare (ftype (function (t t array fixnum fixnum fixnum fixnum t fixnum) t)))
   (let* ((width eldoom-canvas-width)
@@ -1557,13 +1596,13 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
     (ern--clear-vissprites scene)
     (ern--clear-drawsegs scene)
     (ern--clear-draw-items scene)
-    (setf (ern--scene-fixed-colormap scene) fixed-colormap
-          (ern--scene-extra-light scene) extra-light)
+    (setf (ern--scene-fixed-colormap scene) (emo-player-fixed-colormap player)
+          (ern--scene-extra-light scene) (emo-player-extra-light player))
     (eldoom-math-set-view-transformation (ern--scene-view-transformation scene)
                                          x-fx y-fx z-fx
                                          angle-bam)
     (let* ((palettes (ewd-map-palettes map))
-           (palette (aref palettes 0)))
+           (palette (aref palettes 0))) ;; TODO: pick right palette
       (ern--render-node
        scene bitmap data-offset
        root-node
@@ -1574,8 +1613,9 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
        x-fx y-fx angle-bam cos-fx sin-fx z)
       (ern--draw-transparent-queue
        scene bitmap data-offset palette
-       z))
-    canvas))
+       z)
+      (ern--draw-player-sprites scene bitmap data-offset palette player)))
+  canvas)
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("ern-" . "eldoom-render-") ("ewd-" . "eldoom-wad-") ("emo-" . "eldoom-mobj-") ("enf-" . "eldoom-info-") ("emp-" . "eldoom-map-"))

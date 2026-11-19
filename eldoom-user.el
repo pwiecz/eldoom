@@ -37,6 +37,7 @@
 
 (defconst eldoom-user--max-bob #x100000)
 (defconst eldoom-user--bfg-cells 40)
+(defvar-local eldoom-user-cmd nil)
 
 (cl-defstruct (eldoom-user-command (:constructor eldoom-user-make-command)
                                    (:copier nil))
@@ -87,20 +88,21 @@
   (cl-incf (emo-momx mobj) (eldoom-math-mul move (eldoom-math-cos angle)))
   (cl-incf (emo-momy mobj) (eldoom-math-mul move (eldoom-math-sin angle))))
 
-(defun eldoom-user--move-player (player cmd)
+(defun eldoom-user--move-player (player)
   "P_MovePlayer in p_user.c"
   (let* ((mobj (emo-player-mobj player))
          (on-ground (<= (emo-z-fx mobj) (emo-floor-z mobj))))
     (setf (emo-player-on-ground player) on-ground)
-    (eldoom-math-angle-incf (emo-angle mobj) (eldoom-user-command-angle-turn cmd))
-    (when (and (/= 0 (eldoom-user-command-forward-move cmd)) on-ground)
-      (eldoom-user--thrust mobj (emo-angle mobj) (* 2048 (eldoom-user-command-forward-move cmd))))
+    (eldoom-math-angle-incf (emo-angle mobj) (eldoom-user-command-angle-turn eldoom-user-cmd))
+    (when (and (/= 0 (eldoom-user-command-forward-move eldoom-user-cmd)) on-ground)
+      (eldoom-user--thrust mobj (emo-angle mobj) (* 2048 (eldoom-user-command-forward-move eldoom-user-cmd))))
 
-    (when (and (/= 0 (eldoom-user-command-side-move cmd)) on-ground)
-      (eldoom-user--thrust mobj (- (emo-angle mobj) eldoom-math-ang90) (* 2048 (eldoom-user-command-side-move cmd))))
+    (when (and (/= 0 (eldoom-user-command-side-move eldoom-user-cmd)) on-ground)
+      (eldoom-user--thrust mobj (- (emo-angle mobj) eldoom-math-ang90)
+                           (* 2048 (eldoom-user-command-side-move eldoom-user-cmd))))
 
-    (when (and (or (/= 0 (eldoom-user-command-forward-move cmd))
-                   (/= 0 (eldoom-user-command-side-move cmd)))
+    (when (and (or (/= 0 (eldoom-user-command-forward-move eldoom-user-cmd))
+                   (/= 0 (eldoom-user-command-side-move eldoom-user-cmd)))
                (eq (emo-state mobj) (aref enf-states enf-S_PLAY)))
       (emo-set-state mobj (aref enf-states enf-S_PLAY_RUN1)))))
 
@@ -144,6 +146,24 @@ P_UseLines in p_map.c"
   (sx 0 :type fixnum)
   (sy 0 :type fixnum))
 
+(defun eldoom-user-set-sprite (player position state)
+  "P_SetPsprite in p_pspr.c"
+  (let ((sprite (cl-ecase position (:weapon (emo-player-weapon-sprite player))
+                          (:flash (emo-player-flash-sprite player)))))
+    (catch :break
+      (while t
+        (setf (eldoom-user-sprite-state sprite) state)
+        (when (not state)
+          (throw :break t))
+        (setf (eldoom-user-sprite-tics sprite) (enf-state-tics state))
+        (when-let* ((action (eldoom-info-state-action state)))
+          (funcall action player sprite)
+          (when (not (eldoom-user-sprite-state sprite))
+            (throw :break t)))
+        (setq state (enf-state-next (eldoom-user-sprite-state sprite)))
+        (when (/= 0 (eldoom-user-sprite-tics sprite))
+          (throw :break t))))))
+
 (defun eldoom-user--check-ammo (player)
   "P_CheckAmmo in p_pspr.c"
   (let* ((weapon-info (aref enf-weapon-infos (emo-player-ready-weapon player)))
@@ -183,24 +203,6 @@ P_UseLines in p_map.c"
           (setf (emo-player-pending-weapon player) eldoom-globals-wp_fist)))
         (eldoom-user-set-sprite player :weapon (enf-weapon-info-down-state weapon-info))))))
 
-(defun eldoom-user-set-sprite (player position state)
-  "P_SetPsprite in p_pspr.c"
-  (let ((sprite (cl-ecase position (:weapon (emo-player-weapon-sprite player))
-                          (:flash (emo-player-flash-sprite player)))))
-    (catch :break
-      (while t
-        (setf (eldoom-user-sprite-state sprite) state)
-        (when (not state)
-          (throw :break t))
-        (setf (eldoom-user-sprite-tics sprite) (enf-state-tics state))
-        (when-let* ((action (eldoom-info-state-action state)))
-          (funcall action player sprite)
-          (when (not (eldoom-user-sprite-state sprite))
-            (throw :break t)))
-        (setq state (enf-state-next (eldoom-user-sprite-state sprite)))
-        (when (zerop (eldoom-user-sprite-tics sprite))
-          (throw :break t))))))
-
 (defun eldoom-user-fire-weapon (player)
   "P_FireWeapon in p_pspr.c"
   (when (eldoom-user--check-ammo player)
@@ -221,17 +223,17 @@ P_UseLines in p_map.c"
     (setf (eldoom-user-sprite-sy sprite) (+ eldoom-math-unit (eldoom-math-mul (emo-player-bob player)
                                                                               (eldoom-math-sin angle))))))
 
-(defun eldoom-user--a-weapon-ready (player sprite cmd)
+(defun eldoom-user--a-weapon-ready (player sprite)
   "A_WeaponReady in p_pspr.c"
   (let ((mobj (emo-player-mobj player)))
     (when (or (eq (emo-state mobj) (aref enf-states enf-S_PLAY_ATK1))
               (eq (emo-state mobj) (aref enf-states enf-S_PLAY_ATK2)))
       (emo-set-state mobj (aref enf-states enf-S_PLAY))))
-  (if (or (= (emo-player-pending-weapon player) eldoom-globals-wp_no-change)
-          (zerop (emo-health player)))
-      (let ((new-state (enf-weapon-info-ready-state (aref enf-weapon-infos (emo-player-ready-weapon player)))))
+  (if (or (/= (emo-player-pending-weapon player) eldoom-globals-wp_no-change)
+          (zerop (emo-player-health player)))
+      (let ((new-state (enf-weapon-info-down-state (aref enf-weapon-infos (emo-player-ready-weapon player)))))
         (eldoom-user-set-sprite player :weapon new-state))
-    (if (eldoom-user-command-attack-button cmd)
+    (if (eldoom-user-command-attack-button eldoom-user-cmd)
         ;; rocket launcher ang bfg do not autofire
         (if (or (not (emo-player-attack-down player))
                 (and (/= (emo-player-ready-weapon player) eldoom-globals-wp_missile)
@@ -243,13 +245,13 @@ P_UseLines in p_map.c"
       (setf (emo-player-attack-down player) nil))
     (eldoom-user--bob-weapon player sprite)))
 
-(defun eldoom-user--a-light0 (player _sprite _cmd)
+(defun eldoom-user--a-light0 (player _sprite)
   "A_Light0 in p_pspr.c"
   (setf (emo-player-extra-light player) 0))
-(defun eldoom-user--a-light1 (player _sprite _cmd)
+(defun eldoom-user--a-light1 (player _sprite)
   "A_Light1 in p_pspr.c"
   (setf (emo-player-extra-light player) 1))
-(defun eldoom-user--a-light2 (player _sprite _cmd)
+(defun eldoom-user--a-light2 (player _sprite)
   "A_Light2 in p_pspr.c"
   (setf (emo-player-extra-light player) 2))
 
@@ -267,9 +269,10 @@ P_UseLines in p_map.c"
 
 (defconst eldoom-user--lower-speed (eldoom-math-fixed-from-int 6))
 
-(defun eldoom-user--a-lower (player sprite _cmd)
+(defun eldoom-user--a-lower (player sprite)
   "A_Lower in p_pspr.c"
   (cl-incf (eldoom-user-sprite-sy sprite) eldoom-user--lower-speed)
+  (message "A_Lower %d %d" (eldoom-user-sprite-sy sprite) eldoom-user--weapon-bottom)
   (cond
    ((< (eldoom-user-sprite-sy sprite) eldoom-user--weapon-bottom) nil)
    ((= (emo-player-state player) enf-PST_DEAD)
@@ -282,7 +285,7 @@ P_UseLines in p_map.c"
 
 (defconst eldoom-user--raise-speed (eldoom-math-fixed-from-int 6))
 
-(defun eldoom-user--a-raise (player sprite _cmd)
+(defun eldoom-user--a-raise (player sprite)
   "A_Raise in p_pspr.c"
   (cl-decf (eldoom-user-sprite-sy sprite) eldoom-user--raise-speed)
   (when (>= (eldoom-user-sprite-sy sprite) eldoom-user--weapon-top)
@@ -291,13 +294,13 @@ P_UseLines in p_map.c"
                             (enf-weapon-info-ready-state (aref enf-weapon-infos
                                                                (emo-player-ready-weapon player))))))
 
-(defun eldoom-user--a-gun-flash (player _sprite _cmd)
+(defun eldoom-user--a-gun-flash (player _sprite)
   "A_GunFlash in p_pspr.c"
   (emo-set-state (emo-player-mobj player) (aref enf-states enf-S_PLAY_ATK2))
   (let ((weapon-info (aref enf-weapon-infos (emo-player-ready-weapon player))))
     (eldoom-user-set-sprite player :flash (enf-weapon-info-flash-state weapon-info))))
 
-(defun eldoom-user--a-punch (player _sprite _cmd)
+(defun eldoom-user--a-punch (player _sprite)
   "A_Punch in p_pspr.c"
   (let* ((mobj (emo-player-mobj player))
          (damage (eldoom-random-dice 2 10 t))
@@ -310,7 +313,7 @@ P_UseLines in p_map.c"
       (setf (emo-angle mobj) (eldoom-math-atan2 (- (emo-y-fx target) (emo-y-fx mobj))
                                                 (- (emo-x-fx target) (emo-x-fx mobj)))))))
 
-(defun eldoom-user--a-saw (player _sprite _cmd)
+(defun eldoom-user--a-saw (player _sprite)
   "A_Saw in p_pspr.c"
   (let* ((mobj (emo-player-mobj player))
          (damage (eldoom-random-dice 2 10 t))
@@ -355,19 +358,19 @@ P_UseLines in p_map.c"
             (emo-momz missile) (eldoom-math-mul speed (etr-aim-result-slope aim-result)))
       (eph-check-missile-spawn missile))))
 
-(defun eldoom-user--a-fire-missile (player _sprite _cmd)
+(defun eldoom-user--a-fire-missile (player _sprite)
   "A_FireMissile in p_pspr.c"
   (let ((ammo-type (enf-weapon-info-ammo (aref enf-weapon-infos (emo-player-ready-weapon player)))))
     (cl-decf (aref (emo-player-ammo player) ammo-type)))
   (eldoom-user--spawn-player-missile (emo-player-mobj player) enf-MT_ROCKET))
 
-(defun eldoom-user--a-fire-bfg (player _sprite _cmd)
+(defun eldoom-user--a-fire-bfg (player _sprite)
   "A_FireBFG in p_pspr.c"
   (let ((ammo-type (enf-weapon-info-ammo (aref enf-weapon-infos (emo-player-ready-weapon player)))))
     (cl-decf (aref (emo-player-ammo player) ammo-type)) eldoom-user--bfg-cells)
   (eldoom-user--spawn-player-missile (emo-player-mobj player) enf-MT_BFG))
 
-(defun eldoom-user--a-fire-plasma (player _sprite _cmd)
+(defun eldoom-user--a-fire-plasma (player _sprite)
   "A_FirePlasma in p_pspr.c"
   (let* ((weapon-info (aref enf-weapon-infos (emo-player-ready-weapon player)))
          (ammo-type (enf-weapon-info-ammo weapon-info))
@@ -397,7 +400,7 @@ P_UseLines in p_map.c"
       (eldoom-math-angle-incf angle (ash (- (eldoom-random t) (eldoom-random t)) 18)))
     (etr-shoot mobj angle eldoom-globals-missile-range slope damage)))
 
-(defun eldoom-user--a-fire-pistol (player _state _cmd)
+(defun eldoom-user--a-fire-pistol (player _state)
   "A_FirePistol in p_pspr.c"
   (emo-set-state (emo-player-mobj player) (aref enf-states enf-S_PLAY_ATK2))
   (let ((weapon-info (aref enf-weapon-infos (emo-player-ready-weapon player)))
@@ -406,7 +409,7 @@ P_UseLines in p_map.c"
     (eldoom-user-set-sprite player :flash (enf-weapon-info-flash-state weapon-info))
     (eldoom-user--gun-shot (emo-player-mobj player) slope (zerop (emo-player-refire player)))))
 
-(defun eldoom-user--a-fire-shotgun (player _state _cmd)
+(defun eldoom-user--a-fire-shotgun (player _state)
   "A_FireShotgun in p_pspr.c"
   (emo-set-state (emo-player-mobj player) (aref enf-states enf-S_PLAY_ATK2))
   (let ((weapon-info (aref enf-weapon-infos (emo-player-ready-weapon player)))
@@ -416,7 +419,7 @@ P_UseLines in p_map.c"
     (cl-loop repeat 7 do
              (eldoom-user--gun-shot (emo-player-mobj player) slope nil))))
 
-(defun eldoom-user--a-fire-shotgun2 (player _state _cmd)
+(defun eldoom-user--a-fire-shotgun2 (player _state)
   "A_FireShotgun2 in p_pspr.c"
   (emo-set-state (emo-player-mobj player) (aref enf-states enf-S_PLAY_ATK2))
   (let ((weapon-info (aref enf-weapon-infos (emo-player-ready-weapon player)))
@@ -431,7 +434,7 @@ P_UseLines in p_map.c"
                           (+ slope (ash (- (eldoom-random t) (eldoom-random t)) 5))
                           damage)))))
 
-(defun eldoom-user--a-fire-cgun (player state _cmd)
+(defun eldoom-user--a-fire-cgun (player state)
   "A_FireCGun in p_pspr.c"
   (let* ((weapon-info (aref enf-weapon-infos (emo-player-ready-weapon player)))
          (slope (eldoom-user--bullet-slope (emo-player-mobj player)))
@@ -462,12 +465,12 @@ P_UseLines in p_map.c"
                      (cl-incf damage (eldoom-random-dice 1 8 t)))
             (emo-damage target (emo-target mobj) (emo-target mobj) damage)))))))
 
-(defun eldoom-user--a-bfg-sound (_player _state _cmd)
+(defun eldoom-user--a-bfg-sound (_player _state)
   "A_BFGSound in p_pspr.c")
 
-(defun eldoom-user--a-refire (player _state cmd)
+(defun eldoom-user--a-refire (player _state)
   "A_ReFire in p_pspr.c"
-  (if (and (eldoom-user-command-attack-button cmd)
+  (if (and (eldoom-user-command-attack-button eldoom-user-cmd)
            (= (emo-player-pending-weapon player) eldoom-globals-wp_no-change)
            (> (emo-player-health player) 0))
       (progn
@@ -476,7 +479,7 @@ P_UseLines in p_map.c"
     (setf (emo-player-refire player) 0)
     (eldoom-user--check-ammo player)))
 
-(defun eldoom-user--a-check-reload (player _state _cmd)
+(defun eldoom-user--a-check-reload (player _state)
   "A_CheckReload in p_pspr.c"
   (eldoom-user--check-ammo player))
 
@@ -506,14 +509,18 @@ P_UseLines in p_map.c"
    (t name)))
 
 (defun eldoom-user-init (player states)
-  (setf (emo-player-weapon-sprite player) (eldoom-user--make-sprite)
+  (setf eldoom-user-cmd (eldoom-user-make-command)
+        (emo-player-weapon-sprite player) (eldoom-user--make-sprite)
         (emo-player-flash-sprite player) (eldoom-user--make-sprite))
   (cl-loop for state across states do
            (let* ((action-name (enf-state-action-name state))
                   (action (eldoom-user--action-for-name action-name)))
              (when (or (functionp action)
                        (not (functionp (enf-state-action state))))
-               (setf (enf-state-action state) action)))))
+               (setf (enf-state-action state) action))))
+  ;; P_SetupPsprites
+  (setf (emo-player-pending-weapon player) (emo-player-ready-weapon player))
+  (eldoom-user--bring-up-weapon player))
 
 (defun eldoom-user--move-sprite (player position)
   "Part of P_MovePsprites in p_pspr.c"
@@ -596,22 +603,22 @@ P_UseLines in p_map.c"
 
 (defconst eldoom-user--inverse-colormap 32)
 
-(defun eldoom-user-update-player (player cmd)
+(defun eldoom-user-update-player (player)
   "P_PlayerThink in p_user.c"
   (let ((mobj (emo-player-mobj player)))
     (if (eldoom-math-has-flag (emo-player-cheats player) eldoom-globals-CF_NOCLIP)
         (eldoom-math-set-flagf (emo-flags mobj) enf-MF_NOCLIP)
       (eldoom-math-clear-flagf (emo-flags mobj) enf-MF_NOCLIP))
     (when (eldoom-math-has-flag (emo-flags mobj) enf-MF_JUSTATTACKED)
-      (setf (eldoom-user-command-angle-turn cmd) 0
-            (eldoom-user-command-forward-move cmd) (/ #xc800 512)
-            (eldoom-user-command-side-move cmd) 0
+      (setf (eldoom-user-command-angle-turn eldoom-user-cmd) 0
+            (eldoom-user-command-forward-move eldoom-user-cmd) (/ #xc800 512)
+            (eldoom-user-command-side-move eldoom-user-cmd) 0
             (emo-flags mobj) (logand (emo-flags mobj) (lognot enf-MF_JUSTATTACKED))))
     (if (= (emo-player-state player) enf-PST_DEAD)
         (eldoom-user--death-think player)
       (if (/= (emo-reaction-time mobj) 0)
           (cl-decf (emo-reaction-time mobj))
-        (eldoom-user--move-player player cmd))
+        (eldoom-user--move-player player))
       (eldoom-user--calc-height player)
       (when (/= 0 (ewd-sector-special (ewd-subsector-sector (emo-subsector mobj))))
         (eldoom-user--player-in-special-sector player))
@@ -647,9 +654,9 @@ P_UseLines in p_map.c"
                   (if (or (> infrared 128) (/= 0 (logand invul 8)))
                       (aref colormaps 1) nil))
                  (t nil)))))))
-  (setf (eldoom-user-command-angle-turn cmd) 0
-        (eldoom-user-command-forward-move cmd) 0
-        (eldoom-user-command-side-move cmd) 0))
+  (setf (eldoom-user-command-angle-turn eldoom-user-cmd) 0
+        (eldoom-user-command-forward-move eldoom-user-cmd) 0
+        (eldoom-user-command-side-move eldoom-user-cmd) 0))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("enf-" . "eldoom-info-") ("emo-" . "eldoom-mobj-") ("eph-" . "eldoom-phys-") ("ese-" . "eldoom-sector-") ("etr-" . "eldoom-trace-") ("ewd-" . "eldoom-wad-"))

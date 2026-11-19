@@ -34,8 +34,6 @@
 
 ;; (byte-recompile-directory "~/src/eldoom" 0 t)
 
-(defvar-local eldoom-cmd nil)
-
 (defvar-local eldoom-player nil)
 
 (defvar-local eldoom-canvas nil)
@@ -133,8 +131,7 @@ With an interactive prefix argument, prompt for FRAMES."
     (setq debug-on-error t
           eldoom-globals-level-time 0
           eldoom-globals-game-tic (random 256)
-          ewd-current-map map
-          eldoom-cmd (eldoom-user-make-command))
+          ewd-current-map map)
     (eldoom-random-init)
     (enf-init (ewd-map-sprites map))
     (eth-init)
@@ -145,23 +142,23 @@ With an interactive prefix argument, prompt for FRAMES."
     (eldoom-user-init eldoom-player enf-states)
     (etr-init)
     (dotimes (_ warmup-frames)
-      (eldoom-user-update-player eldoom-player eldoom-cmd)
+      (eldoom-user-update-player eldoom-player)
       (eth-run-thinkers)
       (eldoom-special-update)
       (eldoom-render-render-level
        ewd-current-map scene canvas x-fx y-fx z-fx
-       (eldoom--thing-angle-bam player-start) nil 0)
+       (eldoom--thing-angle-bam player-start) eldoom-player)
       (cl-incf eldoom-globals-level-time)
       (cl-incf eldoom-globals-game-tic))
     (garbage-collect)
     (setq started-at (float-time))
     (dotimes (_ frames)
-      (eldoom-user-update-player eldoom-player eldoom-cmd)
+      (eldoom-user-update-player eldoom-player)
       (eth-run-thinkers)
       (eldoom-special-update)
       (eldoom-render-render-level
        ewd-current-map scene canvas x-fx y-fx z-fx
-       (eldoom--thing-angle-bam player-start) nil 0)
+       (eldoom--thing-angle-bam player-start) eldoom-player)
       (cl-incf eldoom-globals-level-time)
       (cl-incf eldoom-globals-game-tic))
     (setq elapsed (- (float-time) started-at))
@@ -210,14 +207,14 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
     (cl-incf (emo-y-fx (emo-player-mobj eldoom-player)) (eldoom-math-fixed-from-int 300))
     (eldoom-math-angle-incf (emo-angle (emo-player-mobj eldoom-player)) eldoom-math-ang90)
     (dotimes (_ 10)
-      (eldoom-user-update-player eldoom-player eldoom-cmd)
+      (eldoom-user-update-player eldoom-player)
       (eth-run-thinkers)
       (eldoom-special-update)
       (let ((player-mobj (emo-player-mobj eldoom-player)))
         (eldoom-render-render-level map scene canvas
                                     (emo-x-fx player-mobj) (emo-y-fx player-mobj)
                                     (emo-z-fx player-mobj) (emo-angle player-mobj)
-                                    nil 0))
+                                    eldoom-player))
       (cl-incf eldoom-globals-level-time)
       (cl-incf eldoom-globals-game-tic))
     (garbage-collect)
@@ -225,14 +222,14 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
     (profiler-reset)
     (profiler-start profiler-type)
     (dotimes (_ frames)
-      (eldoom-user-update-player eldoom-player eldoom-cmd)
+      (eldoom-user-update-player eldoom-player)
       (eth-run-thinkers)
       (eldoom-special-update)
       (let ((player-mobj (emo-player-mobj eldoom-player)))
         (eldoom-render-render-level map scene canvas
                                     (emo-x-fx player-mobj) (emo-y-fx player-mobj)
                                     (emo-z-fx player-mobj) (emo-angle player-mobj)
-                                    nil 0))
+                                    eldoom-player))
       (cl-incf eldoom-globals-level-time)
       (cl-incf eldoom-globals-game-tic))
     (profiler-stop)
@@ -258,7 +255,6 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
          (max-render-time 0))
     (setq eldoom-globals-level-time 0
           eldoom-globals-game-tic (random 256)
-          eldoom-cmd (eldoom-user-make-command)
           ewd-current-map map)
     (eldoom-random-init)
     (enf-init (ewd-map-sprites map))
@@ -289,13 +285,13 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
                   (emo-y-fx player-mobj) y
                   (emo-z-fx player-mobj) z
                   (emo-floor-z player-mobj) z)
-            (eldoom-user-update-player eldoom-player eldoom-cmd)
+            (eldoom-user-update-player eldoom-player)
             (eth-run-thinkers)
             (eldoom-special-update)
             (eldoom-render-render-level
              map scene eldoom-canvas
              (emo-x-fx player-mobj) (emo-y-fx player-mobj)
-             (emo-player-view-z eldoom-player) (emo-angle player-mobj) nil 0)
+             (emo-player-view-z eldoom-player) (emo-angle player-mobj) eldoom-player)
             (setq max-render-time (max (- (float-time) started-at)))
             (when (= 0 (% eldoom-globals-level-time 20))
               (message "eldoom-test-bsp render: %.3fs" max-render-time)
@@ -336,7 +332,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
                                 (y-fx (+ start-y-fx (eldoom-math-mul offset-fx
                                                                      (eldoom-math-sin render-angle-bam)))))
                            (eldoom-render-render-level map scene eldoom-canvas x-fx y-fx nil render-angle-bam
-                                                       nil 0)
+                                                       eldoom-player)
                            (cl-incf eldoom-globals-level-time)
                            (cl-incf eldoom-globals-game-tic)))))))
       (message "Rendered 1000 frames in %.3f seconds. Average %.1f FPS" time (/ 1000.0 time)))))
@@ -354,38 +350,36 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
          (y (emo-y-fx player-mobj))
          (z (emo-player-view-z eldoom-player))
          (angle (emo-angle player-mobj)))
-    (eldoom-render-render-level map scene canvas x y z angle
-                                (emo-player-fixed-colormap eldoom-player)
-                                (emo-player-extra-light eldoom-player))))
+    (eldoom-render-render-level map scene canvas x y z angle eldoom-player)))
 
 (defun eldoom-move-forward (fast)
   (interactive)
-  (cl-incf (eldoom-user-command-forward-move eldoom-cmd)
+  (cl-incf (eldoom-user-command-forward-move eldoom-user-cmd)
            (if fast eldoom-player-move-speed-fast eldoom-player-move-speed)))
 
 (defun eldoom-move-backward (fast)
   (interactive)
-  (cl-decf (eldoom-user-command-forward-move eldoom-cmd)
+  (cl-decf (eldoom-user-command-forward-move eldoom-user-cmd)
            (if fast eldoom-player-move-speed-fast eldoom-player-move-speed)))
 
 (defun eldoom-turn-left (fast)
   (interactive)
-  (cl-incf (eldoom-user-command-angle-turn eldoom-cmd)
+  (cl-incf (eldoom-user-command-angle-turn eldoom-user-cmd)
            (if fast eldoom-player-turn-fast-bam eldoom-player-turn-bam)))
 
 (defun eldoom-turn-right (fast)
   (interactive)
-  (cl-decf (eldoom-user-command-angle-turn eldoom-cmd)
+  (cl-decf (eldoom-user-command-angle-turn eldoom-user-cmd)
            (if fast eldoom-player-turn-fast-bam eldoom-player-turn-bam)))
 
 (defun eldoom-strafe-left (fast)
   (interactive)
-  (cl-decf (eldoom-user-command-side-move eldoom-cmd)
+  (cl-decf (eldoom-user-command-side-move eldoom-user-cmd)
            (if fast eldoom-player-strafe-speed-fast eldoom-player-strafe-speed)))
 
 (defun eldoom-strafe-right (fast)
   (interactive)
-  (cl-incf (eldoom-user-command-side-move eldoom-cmd)
+  (cl-incf (eldoom-user-command-side-move eldoom-user-cmd)
            (if fast eldoom-player-strafe-speed-fast eldoom-player-strafe-speed)))
 
 (defun eldoom-use ()
@@ -478,8 +472,7 @@ Used while the blocking game loop runs and another buffer is focused."
      (setq eldoom-globals-level-time 0
            eldoom-globals-game-tic (random 256)
            ewd-current-map map
-           eldoom-globals-difficulty :easy
-           eldoom-cmd (eldoom-user-make-command))
+           eldoom-globals-difficulty :easy)
      (eldoom-random-init)
      (enf-init (ewd-map-sprites map))
      (eth-init)
@@ -500,7 +493,7 @@ Used while the blocking game loop runs and another buffer is focused."
              ;; 1. THE TIC LOOP (State Updates)
              (while (< last-time now)
                (eldoom--process-input)
-               (eldoom-user-update-player eldoom-player eldoom-cmd)
+               (eldoom-user-update-player eldoom-player)
                (eth-run-thinkers)
                (eldoom-special-update)
                (cl-incf eldoom-globals-level-time)
