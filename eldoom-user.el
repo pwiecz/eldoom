@@ -44,6 +44,7 @@
   (angle-turn 0 :type fixnum)
   (forward-move 0 :type fixnum)
   (side-move 0 :type fixnum)
+  (action-button nil :type boolean)
   (attack-button nil :type boolean))
 
 (defun eldoom-user--calc-height (player)
@@ -127,7 +128,7 @@
         (ese-use-special-line mobj linedef)
         (throw :line-used t)))))
 
-(defun eldoom-user-use-lines (mobj)
+(defun eldoom-user--use-lines (mobj)
   "Try to use a special linedef in front of MOBJ; return non-nil if used.
 P_UseLines in p_map.c"
   (let* ((x-fx (emo-x-fx mobj))
@@ -623,6 +624,8 @@ P_UseLines in p_map.c"
       (when (/= 0 (ewd-sector-special (ewd-subsector-sector (emo-subsector mobj))))
         (eldoom-user--player-in-special-sector player))
       ;; TODO: handle buttons
+      (when (eldoom-user-command-action-button eldoom-user-cmd)
+          (eldoom-user--use-lines mobj))
       (eldoom-user--move-sprites player)
       (let ((powers (emo-player-powers player)))
         (when (/= 0 (aref powers eldoom-globals-pw_strength))
@@ -656,7 +659,9 @@ P_UseLines in p_map.c"
                  (t nil)))))))
   (setf (eldoom-user-command-angle-turn eldoom-user-cmd) 0
         (eldoom-user-command-forward-move eldoom-user-cmd) 0
-        (eldoom-user-command-side-move eldoom-user-cmd) 0))
+        (eldoom-user-command-side-move eldoom-user-cmd) 0
+        (eldoom-user-command-action-button eldoom-user-cmd) nil
+        (eldoom-user-command-attack-button eldoom-user-cmd) nil))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("enf-" . "eldoom-info-") ("emo-" . "eldoom-mobj-") ("eph-" . "eldoom-phys-") ("ese-" . "eldoom-sector-") ("etr-" . "eldoom-trace-") ("ewd-" . "eldoom-wad-"))

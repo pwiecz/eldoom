@@ -1535,21 +1535,27 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
   "R_DrawPSprite in r_things.c"
   (let* ((sprite (enf-state-sprite state))
          (patch (aref (aref sprite (enf-state-frame state)) 0))
+         (height (eldoom-math-fixed-from-int (ewd-patch-height patch)))
+         (y-offset (eldoom-math-fixed-from-int (ewd-patch-y-offset patch)))
          (width (eldoom-math-fixed-from-int (ewd-patch-width patch)))
+         (x-offset (eldoom-math-fixed-from-int (ewd-patch-x-offset patch)))
+         (canvas-width (eldoom-math-fixed-from-int eldoom-canvas-width))
+         (canvas-height (eldoom-math-fixed-from-int eldoom-canvas-height))
          (center-x (ern--scene-center-x scene))
-         (tx (- (eldoom-user-sprite-sx psprite) (ewd-patch-x-offset patch) (/ width 2)))
+         (tx (- (eldoom-user-sprite-sx psprite) (/ canvas-width 2) x-offset))
          (x1 (eldoom-math-fixed-to-int (+ center-x tx)))
          (x2 (1- (eldoom-math-fixed-to-int (+ center-x tx width))))
-         (y (+ (eldoom-math-fixed-from-int (- eldoom-canvas-height (ewd-patch-height patch)))
-               (/ eldoom-math-unit 2) (/ (ewd-patch-y-offset patch) 2)
-               (eldoom-user-sprite-sy psprite)))
+         (y (- (+ (/ canvas-height 2)
+                  (eldoom-user-sprite-sy psprite))
+               y-offset
+               (/ height 2)
+               (* 40 eldoom-math-unit))) ;; TODO: remove this random offset by fixing formula for y
          (colormaps (ern--scene-colormaps scene))
          (fixed-colormap (emo-player-fixed-colormap player))
          (extra-light (emo-player-extra-light player))
          (colormap (ern--find-vissprite-colormap state sector-light eldoom-math-unit fixed-colormap colormaps
                                                  extra-light))
          (vissprite (ern--vissprite-new-from-freelist)))
-    ;; TODO: still alignment (at least in x-axis) doesn't match Doom exactly.
     (when (and (<= x1 eldoom-canvas-width) (>= x2 0))
       (setf (ern--vissprite-x1 vissprite) x1
             (ern--vissprite-x2 vissprite) x2

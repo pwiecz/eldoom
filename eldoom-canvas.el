@@ -51,6 +51,9 @@
     (aset bitmap (1+ offset) (aref color 1))
     (aset bitmap (+ 2 offset) (aref color 2))))
 
+(defvar-local eldoom-canvas-scaled-width eldoom-canvas-width)
+(defvar-local eldoom-canvas-scaled-height eldoom-canvas-height)
+
 (defvar-local eldoom-canvas--last-win-width -1)
 (defvar-local eldoom-canvas--last-win-height -1)
 
@@ -71,10 +74,12 @@
             ;; Mutate the image descriptor to match the window size
             (let ((scaled-win-height (truncate (* win-width (/ (* eldoom-pixel-ratio eldoom-canvas-height) eldoom-canvas-width)))))
               (if (<= scaled-win-height win-height)
-                  (setf (image-property image :width) win-width
-                        (image-property image :height) scaled-win-height)
-                (setf (image-property image :width) (truncate (* win-height (/ eldoom-canvas-width (* eldoom-pixel-ratio eldoom-canvas-height))))
-                      (image-property image :height) win-height))))))
+                  (setq eldoom-canvas-scaled-width win-width
+                        eldoom-canvas-scaled-height scaled-win-height)
+                (setq eldoom-canvas-scaled-width (truncate (* win-height (/ eldoom-canvas-width (* eldoom-pixel-ratio eldoom-canvas-height))))
+                      eldoom-canvas-scaled-height win-height)))
+            (setf (image-property image :width) eldoom-canvas-scaled-width
+                  (image-property image :height) eldoom-canvas-scaled-height))))
       
       (erase-buffer)
       (insert-image image)

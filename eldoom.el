@@ -47,30 +47,30 @@
 
 
 (defvar-local eldoom--mouse-preset-x nil)
-(defvar-local eldoom--mouse-preset-y nil)
 (defvar-local eldoom--mouse-position-jitter 0)
 (defvar-local eldoom--mouse-sensitivity 5000000)
-(defun eldoom--mouse-move (_event)
-  (interactive "e")
-  (setq-local eldoom--mouse-sensitivity 5000000)
+
+(defun eldoom--mouse-move ()
+  (interactive)
   (let* ((pos (mouse-pixel-position))
          (x (cadr pos))
          (y (cddr pos))
-         (width (window-pixel-width))
-         (height (window-pixel-height))
          (left (window-pixel-left))
          (top (window-pixel-top)))
-    (when (and (<= 0 x (+ left (1- width))) (<= 0 y (+ (1- height) top)))
-      (when (and eldoom--mouse-preset-x eldoom--mouse-preset-y)
+    (when (and (<= 0 x (+ left (1- (window-pixel-width)))) (<= 0 y (+ (1- (window-pixel-height)) top)))
+      (when eldoom--mouse-preset-x
         (let ((dx (- x eldoom--mouse-preset-x)))
           (cl-decf (eldoom-user-command-angle-turn eldoom-user-cmd) (* dx eldoom--mouse-sensitivity))))
-      (let ((half-width (/ (window-pixel-width) 2))
-            (half-height (/ (window-pixel-height) 2)))
-        (setq eldoom--mouse-preset-x half-width
-              eldoom--mouse-preset-y (+ eldoom--mouse-position-jitter half-height))
-        (set-mouse-pixel-position (selected-frame)
-                                  eldoom--mouse-preset-x eldoom--mouse-preset-y)
-        (setq eldoom--mouse-position-jitter (- 1 eldoom--mouse-position-jitter))))))
+      (setq eldoom--mouse-preset-x (+ left (/ eldoom-canvas-scaled-width 2)))
+      (set-mouse-pixel-position (selected-frame)
+                                eldoom--mouse-preset-x
+                                (+ eldoom--mouse-position-jitter top (/ eldoom-canvas-scaled-height 2)))
+      (setq eldoom--mouse-position-jitter (- 1 eldoom--mouse-position-jitter)))))
+
+(defun eldoom--mouse-left-down ()
+  (interactive)
+  (message "Attack")
+  (setf (eldoom-user-command-attack-button eldoom-user-cmd) t))
 
 (defun eldoom--handle-any-key ()
   (interactive))
@@ -109,6 +109,9 @@
         (define-key map (kbd "q") #'eldoom-quit)
         (define-key map (kbd "C-g") #'eldoom-quit)
         (define-key map [mouse-movement] #'eldoom--mouse-move)
+        (define-key map [down-mouse-1] #'eldoom--mouse-left-down)
+        (define-key map [double-down-mouse-1] #'eldoom--mouse-left-down)
+        (define-key map [triple-down-mouse-1] #'eldoom--mouse-left-down)
         (define-key map [t] #'eldoom--handle-any-key)
         map))
 
@@ -150,6 +153,7 @@
 (defun eldoom-quit ()
   (interactive)
   (unless eldoom-quitting
+    (message "Quitting eldoom")
     (setq eldoom-quitting t)
     (when (timerp eldoom--timer)
       (cancel-timer eldoom--timer))
@@ -488,8 +492,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
 (defun eldoom-use ()
   "Use a special linedef in front of the player (space / use key)."
   (interactive)
-  (when (and ewd-current-map eldoom-player)
-    (eldoom-user-use-lines (emo-player-mobj eldoom-player))))
+  (setf (eldoom-user-command-action-button eldoom-user-cmd) t))
 
 ;; TODO: try finding a way make emacs do it by itself instead of us simulating
 ;; emacs input dispatching
@@ -646,7 +649,10 @@ Used while the blocking game loop runs and another buffer is focused."
      (eac-init-actions enf-states)
      (eldoom-user-init eldoom-player enf-states)
      (etr-init)
-     (set-mouse-pixel-position (selected-frame) (/ (frame-width (selected-frame)) 2) (/ (frame-height (selected-frame)) 2)))
+     (let ((left (window-pixel-left))
+           (top (window-pixel-top)))
+       (set-mouse-pixel-position (selected-frame) (+ left (/ eldoom-canvas-scaled-width 2))
+                                 (+ top (/ eldoom-canvas-scaled-height 2)))))
     ;; (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
     (garbage-collect)
     (condition-case nil
@@ -694,4 +700,3 @@ Used while the blocking game loop runs and another buffer is focused."
 ;; End:
 (provide 'eldoom)
 ;;; eldoom.el ends here
-
