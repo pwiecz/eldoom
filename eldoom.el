@@ -69,7 +69,7 @@
 
 (defun eldoom--mouse-left-down ()
   (interactive)
-  (message "Attack")
+  ;; TODO: keep shooting until we detect left-up
   (setf (eldoom-user-command-attack-button eldoom-user-cmd) t))
 
 (defun eldoom--handle-any-key ()
