@@ -41,8 +41,84 @@
 (defvar-local eldoom-frame-gc-cons-threshold (* 100 1024 1024))
 ;;   "Temporary `gc-cons-threshold' used while rendering animation frames.")
 (defvar-local eldoom--saved-gc-cons-threshold nil)
+(defvar-local eldoom--saved-mouse-color nil)
+(defvar-local eldoom--saved-x-pointer-shape nil)
+(defvar-local eldoom--timer nil)
 
-(define-derived-mode eldoom-mode special-mode "Emacs Doom"
+
+(defvar-local eldoom--mouse-preset-x nil)
+(defvar-local eldoom--mouse-preset-y nil)
+(defvar-local eldoom--mouse-position-jitter 0)
+(defvar-local eldoom--mouse-sensitivity 5000000)
+(defun eldoom--mouse-move (_event)
+  (interactive "e")
+  (setq-local eldoom--mouse-sensitivity 5000000)
+  (let* ((pos (mouse-pixel-position))
+         (x (cadr pos))
+         (y (cddr pos))
+         (width (window-pixel-width))
+         (height (window-pixel-height))
+         (left (window-pixel-left))
+         (top (window-pixel-top)))
+    (when (and (<= 0 x (+ left (1- width))) (<= 0 y (+ (1- height) top)))
+      (when (and eldoom--mouse-preset-x eldoom--mouse-preset-y)
+        (let ((dx (- x eldoom--mouse-preset-x)))
+          (cl-decf (eldoom-user-command-angle-turn eldoom-user-cmd) (* dx eldoom--mouse-sensitivity))))
+      (let ((half-width (/ (window-pixel-width) 2))
+            (half-height (/ (window-pixel-height) 2)))
+        (setq eldoom--mouse-preset-x half-width
+              eldoom--mouse-preset-y (+ eldoom--mouse-position-jitter half-height))
+        (set-mouse-pixel-position (selected-frame)
+                                  eldoom--mouse-preset-x eldoom--mouse-preset-y)
+        (setq eldoom--mouse-position-jitter (- 1 eldoom--mouse-position-jitter))))))
+
+(defun eldoom--handle-any-key ()
+  (interactive))
+
+(defvar eldoom-mode-map nil)
+(setq eldoom-mode-map
+      (let ((map (make-sparse-keymap)))
+        (define-key map (kbd "<left>") #'eldoom-turn-left)
+        (define-key map (kbd "a") #'eldoom-strafe-left)
+        (define-key map (kbd "A") #'eldoom-strafe-left-fast)
+        (define-key map (kbd "S-<left>") #'eldoom-turn-left-fast)
+        (define-key map (kbd "<right>") #'eldoom-turn-right)
+        (define-key map (kbd "d") #'eldoom-strafe-right)
+        (define-key map (kbd "D") #'eldoom-strafe-right-fast)
+        (define-key map (kbd "S-<right>") #'eldoom-turn-right-fast)
+        (define-key map (kbd "M-<left>") #'eldoom-strafe-left)
+        (define-key map (kbd "M-S-<left>") #'eldoom-strafe-left-fast)
+        (define-key map (kbd "M-<right>") #'eldoom-strafe-right)
+        (define-key map (kbd "M-S-<right>") #'eldoom-strafe-right-fast)
+        (define-key map (kbd "<up>") #'eldoom-move-forward)
+        (define-key map (kbd "M-<up>") #'eldoom-move-forward)
+        (define-key map (kbd "S-<up>") #'eldoom-move-forward-fast)
+        (define-key map (kbd "M-S-<up>") #'eldoom-move-forward-fast)
+        (define-key map (kbd "w") #'eldoom-move-forward)
+        (define-key map (kbd "W") #'eldoom-move-forward-fast)
+        (define-key map (kbd "<down>") #'eldoom-move-backward)
+        (define-key map (kbd "M-<down>") #'eldoom-move-backward)
+        (define-key map (kbd "S-<down>") #'eldoom-move-backward-fast)
+        (define-key map (kbd "M-S-<down>") #'eldoom-move-backward-fast)
+        (define-key map (kbd "s") #'eldoom-move-backward)
+        (define-key map (kbd "S") #'eldoom-move-backward-fast)
+        (define-key map (kbd "<SPC>") #'eldoom-use)
+        (define-key map (kbd "M-<SPC>") #'eldoom-use)
+        (define-key map (kbd "S-<SPC>") #'eldoom-use)
+        (define-key map (kbd "M-S-<SPC>") #'eldoom-use)
+        (define-key map (kbd "q") #'eldoom-quit)
+        (define-key map (kbd "C-g") #'eldoom-quit)
+        (define-key map [mouse-movement] #'eldoom--mouse-move)
+        (define-key map [t] #'eldoom--handle-any-key)
+        map))
+
+(define-derived-mode eldoom-mode special-mode "ELDooom"
+  (setq-local overriding-local-map eldoom-mode-map
+              track-mouse t
+              mouse-fine-grained-tracking t
+              cursor-type nil
+              make-pointer-invisible t
+              mouse-highlight nil)
   (buffer-disable-undo)
   (add-hook 'kill-buffer-hook #'eldoom-quit nil 'local))
 
@@ -50,31 +126,46 @@
   (setq debug-on-error t)
   (unless eldoom--saved-gc-cons-threshold
     (setq eldoom--saved-gc-cons-threshold gc-cons-threshold))
+  (unless eldoom--saved-mouse-color
+    (setq eldoom--saved-mouse-color (alist-get 'mouse-color (frame-parameters))))
+  (unless eldoom--saved-x-pointer-shape
+    (setq eldoom--saved-x-pointer-shape x-pointer-shape))
+  (setq x-pointer-shape x-pointer-invisible)
+  (if (and (stringp eldoom--saved-mouse-color) (string= eldoom--saved-mouse-color "yellow"))
+      (set-mouse-color "#aaaaaa")
+    (set-mouse-color "yellow")) ;; change mouse color to trigger applying new x-pointer-shape
   (setq gc-cons-threshold eldoom-frame-gc-cons-threshold)
   (when (or (< most-positive-fixnum 281474976710655)
             (> most-negative-fixnum -281474976710656))
     (error "Fixnum range is too small [%d, %d], at least 48-bits needed"
            most-negative-fixnum most-positive-fixnum))
-  (pop-to-buffer-same-window (get-buffer-create eldoom-globals-buffer-name))
+  ;;(pop-to-buffer-same-window (get-buffer-create eldoom-globals-buffer-name))
+  (let ((buf (get-buffer-create eldoom-globals-buffer-name)))
+    (switch-to-buffer buf))
   (setq eldoom-quitting nil)
   (eldoom-mode)
-  (setq eldoom-canvas (eldoom-create-canvas eldoom-canvas-width eldoom-canvas-height))
-  (setq cursor-type nil))
+  (setq eldoom-canvas (eldoom-create-canvas eldoom-canvas-width eldoom-canvas-height)))
+
 
 (defun eldoom-quit ()
   (interactive)
   (unless eldoom-quitting
     (setq eldoom-quitting t)
+    (when (timerp eldoom--timer)
+      (cancel-timer eldoom--timer))
     (when eldoom--saved-gc-cons-threshold
       (setq gc-cons-threshold eldoom--saved-gc-cons-threshold
             eldoom--saved-gc-cons-threshold nil))
+    (setq x-pointer-shape eldoom--saved-x-pointer-shape)
+    (set-mouse-color eldoom--saved-mouse-color)
     (when (get-buffer eldoom-globals-buffer-name)
       (kill-buffer eldoom-globals-buffer-name)
       (clear-image-cache))
     (setq debug-on-error nil)))
+;;(quit-window t)))
 
 (defvar eldoom-wad-path nil
-  "Default WAD path used by Emacs Doom test helpers.")
+  "Default WAD path used by ELDoom test helpers.")
 
 (if (eq system-type 'windows-nt)
     (setq eldoom-wad-path "c:/wad/freedoom2.wad")
@@ -88,16 +179,16 @@
   (eth-register-mobj-thinker (emo-player-mobj eldoom-player)))
 
 (defun eldoom--game-buffer ()
-  "Return the live Emacs Doom display buffer, or signal an error."
+  "Return the live ELDoom display buffer, or signal an error."
   (or (get-buffer eldoom-globals-buffer-name)
-      (error "Emacs Doom buffer %S is not open" eldoom-globals-buffer-name)))
+      (error "ELDoom buffer %S is not open" eldoom-globals-buffer-name)))
 
 (defmacro eldoom--with-game-buffer (&rest body)
-  "Evaluate BODY with the Emacs Doom buffer current."
+  "Evaluate BODY with the ELDoom buffer current."
   `(with-current-buffer (eldoom--game-buffer) ,@body))
 
 (defun eldoom--game-buffer-selected-p ()
-  "Return non-nil when the Emacs Doom buffer is shown in the selected window."
+  "Return non-nil when the ELDoom buffer is shown in the selected window."
   (let ((game-buffer (get-buffer eldoom-globals-buffer-name)))
     (and game-buffer
          (eq (window-buffer (selected-window)) game-buffer))))
@@ -352,35 +443,47 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
          (angle (emo-angle player-mobj)))
     (eldoom-render-render-level map scene canvas x y z angle eldoom-player)))
 
-(defun eldoom-move-forward (fast)
+(defun eldoom-move-forward ()
   (interactive)
-  (cl-incf (eldoom-user-command-forward-move eldoom-user-cmd)
-           (if fast eldoom-player-move-speed-fast eldoom-player-move-speed)))
+  (setf (eldoom-user-command-forward-move eldoom-user-cmd) eldoom-player-move-speed))
+(defun eldoom-move-forward-fast ()
+  (interactive)
+  (setf (eldoom-user-command-forward-move eldoom-user-cmd) eldoom-player-move-speed-fast))
 
-(defun eldoom-move-backward (fast)
+(defun eldoom-move-backward ()
   (interactive)
-  (cl-decf (eldoom-user-command-forward-move eldoom-user-cmd)
-           (if fast eldoom-player-move-speed-fast eldoom-player-move-speed)))
+  (setf (eldoom-user-command-forward-move eldoom-user-cmd) (- eldoom-player-move-speed)))
+(defun eldoom-move-backward-fast ()
+  (interactive)
+  (setf (eldoom-user-command-forward-move eldoom-user-cmd) (- eldoom-player-move-speed-fast)))
 
-(defun eldoom-turn-left (fast)
+(defun eldoom-turn-left ()
   (interactive)
-  (cl-incf (eldoom-user-command-angle-turn eldoom-user-cmd)
-           (if fast eldoom-player-turn-fast-bam eldoom-player-turn-bam)))
+  (setf (eldoom-user-command-angle-turn eldoom-user-cmd) eldoom-player-turn-bam))
+(defun eldoom-turn-left-fast ()
+  (interactive)
+  (setf (eldoom-user-command-angle-turn eldoom-user-cmd) eldoom-player-turn-fast-bam))
 
-(defun eldoom-turn-right (fast)
+(defun eldoom-turn-right ()
   (interactive)
-  (cl-decf (eldoom-user-command-angle-turn eldoom-user-cmd)
-           (if fast eldoom-player-turn-fast-bam eldoom-player-turn-bam)))
+  (setf (eldoom-user-command-angle-turn eldoom-user-cmd) (- eldoom-player-turn-bam)))
+(defun eldoom-turn-right-fast ()
+  (interactive)
+  (setf (eldoom-user-command-angle-turn eldoom-user-cmd) (- eldoom-player-turn-fast-bam)))
 
-(defun eldoom-strafe-left (fast)
+(defun eldoom-strafe-right ()
   (interactive)
-  (cl-decf (eldoom-user-command-side-move eldoom-user-cmd)
-           (if fast eldoom-player-strafe-speed-fast eldoom-player-strafe-speed)))
+  (setf (eldoom-user-command-side-move eldoom-user-cmd) eldoom-player-strafe-speed))
+(defun eldoom-strafe-right-fast ()
+  (interactive)
+  (setf (eldoom-user-command-side-move eldoom-user-cmd) eldoom-player-strafe-speed-fast))
 
-(defun eldoom-strafe-right (fast)
+(defun eldoom-strafe-left ()
   (interactive)
-  (cl-incf (eldoom-user-command-side-move eldoom-user-cmd)
-           (if fast eldoom-player-strafe-speed-fast eldoom-player-strafe-speed)))
+  (setf (eldoom-user-command-side-move eldoom-user-cmd) (- eldoom-player-strafe-speed)))
+(defun eldoom-strafe-left-fast ()
+  (interactive)
+  (setf (eldoom-user-command-side-move eldoom-user-cmd) (- eldoom-player-strafe-speed-fast)))
 
 (defun eldoom-use ()
   "Use a special linedef in front of the player (space / use key)."
@@ -407,51 +510,111 @@ Used while the blocking game loop runs and another buffer is focused."
                       (call-interactively cmd)))
                 (set-buffer target-buffer)))))))))
 
+
+(defun eldoom--inject-mouse-move (x y)
+  "Inject a synthetic mouse-movement event at frame pixel (X, Y)."
+  (when-let* ((posn (posn-at-x-y x y (selected-frame) t)))
+    (push (list 'mouse-movement posn) unread-command-events)))
+
+(defun eldoom--mouse-coordinate (event)
+  (nth 2 (cadr event)))
 (defun eldoom--process-input ()
   ;; Only drain unread input while the game buffer owns the selected window.
   ;; `read-key-sequence-vector' reads the global event queue and would
   ;; otherwise steal keys meant for the buffer the user switched to.
   (when (eldoom--game-buffer-selected-p)
+    ;;(track-mouse
     (let ((game-buffer (current-buffer)))
-      (while (input-pending-p)
-        (let* ((keys (read-key-sequence-vector nil nil t nil t)))
-          (when (length> keys 0)
-            (unwind-protect
-                (cond ((equal keys [?a]) (eldoom-strafe-left nil))
-                      ((equal keys [?A]) (eldoom-strafe-left t))
-                      ((equal keys [?d]) (eldoom-strafe-right nil))
-                      ((equal keys [?D]) (eldoom-strafe-right t))
-                      ((equal keys [?w]) (eldoom-move-forward nil))
-                      ((equal keys [?W]) (eldoom-move-forward t))
-                      ((equal keys [?s]) (eldoom-move-backward nil))
-                      ((equal keys [?S]) (eldoom-move-backward t))
-                      ((equal keys [?q]) (eldoom-turn-left nil))
-                      ((equal keys [?S]) (eldoom-turn-left t))
-                      ((equal keys [?e]) (eldoom-turn-right nil))
-                      ((equal keys [?E]) (eldoom-turn-right t))
-                      ((equal keys [?\s]) (eldoom-use))
-                      ;; cursor keys have inverted move/strafe logic vs AWSD
-                      ;; as I'm just more used to it...
-                      ((equal keys [left]) (eldoom-turn-left t))
-                      ((equal keys [M-left]) (eldoom-strafe-left t))
-                      ((equal keys [right]) (eldoom-turn-right t))
-                      ((equal keys [M-right]) (eldoom-strafe-right t))
-                      ((equal keys [up]) (eldoom-move-forward t))
-                      ((equal keys [M-up]) (eldoom-move-forward t))
-                      ((equal keys [down]) (eldoom-move-backward t))
-                      ((equal keys [M-down]) (eldoom-move-backward t))
-                      ((equal keys [prior]) (eldoom-strafe-left t))
-                      ((equal keys [next]) (eldoom-strafe-right t))
+      (let* ((keys (read-key-sequence-vector nil nil t nil t)))
+        (when (length> keys 0)
+          (unwind-protect
+              (cond ((equal keys [?a]) (eldoom-strafe-left))
+                    ((equal keys [?A]) (eldoom-strafe-left-fast))
+                    ((equal keys [?d]) (eldoom-strafe-right))
+                    ((equal keys [?D]) (eldoom-strafe-right-fast))
+                    ((equal keys [?w]) (eldoom-move-forward))
+                    ((equal keys [?W]) (eldoom-move-forward-fast))
+                    ((equal keys [?s]) (eldoom-move-backward))
+                    ((equal keys [?S]) (eldoom-move-backward-fast))
+                    ((equal keys [?q]) (eldoom-turn-left))
+                    ((equal keys [?S]) (eldoom-turn-left-fast))
+                    ((equal keys [?e]) (eldoom-turn-right))
+                    ((equal keys [?E]) (eldoom-turn-right-fast))
+                    ((equal keys [?\s]) (eldoom-use))
+                    ;; cursor keys have inverted move/strafe logic vs AWSD
+                    ;; as I'm just more used to it...
+                    ((equal keys [left]) (eldoom-turn-left-fast))
+                    ((equal keys [M-left]) (eldoom-strafe-left-fast))
+                    ((equal keys [right]) (eldoom-turn-right-fast))
+                    ((equal keys [M-right]) (eldoom-strafe-right-fast))
+                    ((equal keys [up]) (eldoom-move-forward-fast))
+                    ((equal keys [M-up]) (eldoom-move-forward-fast))
+                    ((equal keys [down]) (eldoom-move-backward-fast))
+                    ((equal keys [M-down]) (eldoom-move-backward-fast))
+                    ((equal keys [prior]) (eldoom-strafe-left-fast))
+                    ((equal keys [next]) (eldoom-strafe-right-fast))
 
-                      ((equal keys [?\C-g]) (keyboard-quit))
-                      (t
-                       (let ((cmd (key-binding keys)))
-                         (when (commandp cmd)
-                           (ignore-errors (call-interactively cmd))))))
-              (set-buffer game-buffer))))))))
+                    ((equal keys [?\C-g]) (keyboard-quit))
+                    (t
+                     (let ((cmd (key-binding keys)))
+                       (when (commandp cmd)
+                         (ignore-errors (call-interactively cmd))))))
+            (set-buffer game-buffer)))))))
 
 (defun eldoom--tic-time ()
   (car (time-convert (time-stamp) eldoom-globals-tic-rate)))
+
+(defvar-local eldoom--scene nil)
+
+(defun eldoom--tic ()
+  (eldoom--with-game-buffer
+   (unless (with-local-quit
+             (eldoom-user-update-player eldoom-player)
+             (eth-run-thinkers)
+             (eldoom-special-update)
+             (cl-incf eldoom-globals-level-time)
+             (cl-incf eldoom-globals-game-tic)
+             (eldoom--render-view ewd-current-map eldoom--scene eldoom-canvas)
+             (eldoom-render eldoom-canvas)
+             (redisplay t)
+             (sit-for 0.001)
+             t)
+     (eldoom-quit))))
+
+(defun eldoom-timer-based ()
+  (interactive)
+  (eldoom-init)
+  (let* ((_ (message "Reading wad directory from %s" eldoom-wad-path))
+         (directory (ewd-read-directory eldoom-wad-path))
+         (map-name "MAP01")
+         (_ (message "Reading map %s" map-name))
+         (map (ewd-load-map eldoom-wad-path directory map-name))
+         (scene (eldoom-render-scene-for-map map))
+         (_ (message "Map read"))
+         (player-start (seq-find (lambda (thing)
+                                   (= (ewd-thing-type thing) 1))
+                                 (ewd-map-things map))))
+    (eldoom--with-game-buffer
+     (setq eldoom-globals-level-time 0
+           eldoom-globals-game-tic (random 256)
+           ewd-current-map map
+           eldoom--scene scene
+           eldoom-globals-difficulty :easy)
+     (eldoom-random-init)
+     (enf-init (ewd-map-sprites map))
+     (eth-init)
+     (eldoom-special-init map)
+     (emo-init-things map)
+     (eldoom--init-player-at-thing player-start)
+     (eac-init-actions enf-states)
+     (eldoom-user-init eldoom-player enf-states)
+     (etr-init))
+    (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
+    (garbage-collect)
+    (when (timerp eldoom--timer)
+      (cancel-timer eldoom--timer))
+    (setq eldoom--timer
+          (run-at-time nil (/ 1.0 35.0) #'eldoom--tic))))
 
 (defun eldoom ()
   (interactive)
@@ -472,6 +635,7 @@ Used while the blocking game loop runs and another buffer is focused."
      (setq eldoom-globals-level-time 0
            eldoom-globals-game-tic (random 256)
            ewd-current-map map
+           eldoom--scene scene
            eldoom-globals-difficulty :easy)
      (eldoom-random-init)
      (enf-init (ewd-map-sprites map))
@@ -481,7 +645,8 @@ Used while the blocking game loop runs and another buffer is focused."
      (eldoom--init-player-at-thing player-start)
      (eac-init-actions enf-states)
      (eldoom-user-init eldoom-player enf-states)
-     (etr-init))
+     (etr-init)
+     (set-mouse-pixel-position (selected-frame) (/ (frame-width (selected-frame)) 2) (/ (frame-height (selected-frame)) 2)))
     ;; (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
     (garbage-collect)
     (condition-case nil
@@ -518,7 +683,6 @@ Used while the blocking game loop runs and another buffer is focused."
 
              (unless (eldoom--game-buffer-selected-p)
                (eldoom--dispatch-selected-buffer-input))
-
              ;; `sleep-for' yields without reading the input queue; `sit-for'
              ;; would consume keys meant for the focused buffer.
              (sleep-for 0.001))))
@@ -530,3 +694,4 @@ Used while the blocking game loop runs and another buffer is focused."
 ;; End:
 (provide 'eldoom)
 ;;; eldoom.el ends here
+

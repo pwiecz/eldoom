@@ -26,7 +26,9 @@
   (let* ((header (concat "P6 " (number-to-string width) " " (number-to-string height) " 255\n"))
 	 (data (string-to-unibyte
 		(concat header (make-string (* width height 3) 0))))
-	 (image (create-image data 'pbm t :width width :height height :pointer 'arrow :foreground "black" :background "white" :transform-smoothing nil)))
+	 (image (create-image data 'pbm t :width width :height height :pointer 'text :foreground "black" :background "white" :transform-smoothing nil)))
+    ;; Use text as pointer type, to hide the mouse pointer, as in eldoom-init
+    ;; we set x-pointer-shape to x-pointer-invisible
     (setq image-scaling-factor 1)
     (eldoom-canvas--make-canvas
      :data-offset (length header)
