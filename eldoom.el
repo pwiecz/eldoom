@@ -172,8 +172,8 @@
   "Default WAD path used by ELDoom test helpers.")
 
 (if (eq system-type 'windows-nt)
-    (setq eldoom-wad-path "c:/wad/freedoom2.wad")
-  ;; (setq eldoom-wad-path "c:/wad/DOOM2.WAD")
+    ;;  (setq eldoom-wad-path "c:/wad/freedoom2.wad")
+    (setq eldoom-wad-path "c:/wad/DOOM2.WAD")
   ;; (setq eldoom-wad-path "/usr/share/games/doom/freedoom2.wad"))
   ;; (setq eldoom-wad-path "/home/piotr/wad/doom.wad"))
   (setq eldoom-wad-path "/home/piotr/wad/DOOM2.WAD"))
@@ -494,79 +494,6 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
   (interactive)
   (setf (eldoom-user-command-action-button eldoom-user-cmd) t))
 
-;; TODO: try finding a way make emacs do it by itself instead of us simulating
-;; emacs input dispatching
-(defun eldoom--dispatch-selected-buffer-input ()
-  "Run pending key bindings in the selected window's buffer.
-Used while the blocking game loop runs and another buffer is focused."
-  (let* ((target-window (selected-window))
-         (target-buffer (window-buffer target-window))
-         (game-buffer (get-buffer eldoom-globals-buffer-name)))
-    (unless (and game-buffer (eq target-buffer game-buffer))
-      (with-current-buffer target-buffer
-        (while (input-pending-p)
-          (let* ((keys (read-key-sequence-vector nil nil t nil t)))
-            (when (length> keys 0)
-              (unwind-protect
-                  (let ((cmd (key-binding keys)))
-                    (when (commandp cmd)
-                      (call-interactively cmd)))
-                (set-buffer target-buffer)))))))))
-
-
-(defun eldoom--inject-mouse-move (x y)
-  "Inject a synthetic mouse-movement event at frame pixel (X, Y)."
-  (when-let* ((posn (posn-at-x-y x y (selected-frame) t)))
-    (push (list 'mouse-movement posn) unread-command-events)))
-
-(defun eldoom--mouse-coordinate (event)
-  (nth 2 (cadr event)))
-(defun eldoom--process-input ()
-  ;; Only drain unread input while the game buffer owns the selected window.
-  ;; `read-key-sequence-vector' reads the global event queue and would
-  ;; otherwise steal keys meant for the buffer the user switched to.
-  (when (eldoom--game-buffer-selected-p)
-    ;;(track-mouse
-    (let ((game-buffer (current-buffer)))
-      (let* ((keys (read-key-sequence-vector nil nil t nil t)))
-        (when (length> keys 0)
-          (unwind-protect
-              (cond ((equal keys [?a]) (eldoom-strafe-left))
-                    ((equal keys [?A]) (eldoom-strafe-left-fast))
-                    ((equal keys [?d]) (eldoom-strafe-right))
-                    ((equal keys [?D]) (eldoom-strafe-right-fast))
-                    ((equal keys [?w]) (eldoom-move-forward))
-                    ((equal keys [?W]) (eldoom-move-forward-fast))
-                    ((equal keys [?s]) (eldoom-move-backward))
-                    ((equal keys [?S]) (eldoom-move-backward-fast))
-                    ((equal keys [?q]) (eldoom-turn-left))
-                    ((equal keys [?S]) (eldoom-turn-left-fast))
-                    ((equal keys [?e]) (eldoom-turn-right))
-                    ((equal keys [?E]) (eldoom-turn-right-fast))
-                    ((equal keys [?\s]) (eldoom-use))
-                    ;; cursor keys have inverted move/strafe logic vs AWSD
-                    ;; as I'm just more used to it...
-                    ((equal keys [left]) (eldoom-turn-left-fast))
-                    ((equal keys [M-left]) (eldoom-strafe-left-fast))
-                    ((equal keys [right]) (eldoom-turn-right-fast))
-                    ((equal keys [M-right]) (eldoom-strafe-right-fast))
-                    ((equal keys [up]) (eldoom-move-forward-fast))
-                    ((equal keys [M-up]) (eldoom-move-forward-fast))
-                    ((equal keys [down]) (eldoom-move-backward-fast))
-                    ((equal keys [M-down]) (eldoom-move-backward-fast))
-                    ((equal keys [prior]) (eldoom-strafe-left-fast))
-                    ((equal keys [next]) (eldoom-strafe-right-fast))
-
-                    ((equal keys [?\C-g]) (keyboard-quit))
-                    (t
-                     (let ((cmd (key-binding keys)))
-                       (when (commandp cmd)
-                         (ignore-errors (call-interactively cmd))))))
-            (set-buffer game-buffer)))))))
-
-(defun eldoom--tic-time ()
-  (car (time-convert (time-stamp) eldoom-globals-tic-rate)))
-
 (defvar-local eldoom--scene nil)
 
 (defun eldoom--tic ()
@@ -584,7 +511,7 @@ Used while the blocking game loop runs and another buffer is focused."
              t)
      (eldoom-quit))))
 
-(defun eldoom-timer-based ()
+(defun eldoom ()
   (interactive)
   (eldoom-init)
   (let* ((_ (message "Reading wad directory from %s" eldoom-wad-path))
@@ -612,88 +539,12 @@ Used while the blocking game loop runs and another buffer is focused."
      (eac-init-actions enf-states)
      (eldoom-user-init eldoom-player enf-states)
      (etr-init))
-    (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
+    ;; (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
     (garbage-collect)
     (when (timerp eldoom--timer)
       (cancel-timer eldoom--timer))
     (setq eldoom--timer
           (run-at-time nil (/ 1.0 35.0) #'eldoom--tic))))
-
-(defun eldoom ()
-  (interactive)
-  (eldoom-init)
-  (let* ((_ (message "Reading wad directory from %s" eldoom-wad-path))
-         (directory (ewd-read-directory eldoom-wad-path))
-         (map-name "MAP01")
-         (_ (message "Reading map %s" map-name))
-         (map (ewd-load-map eldoom-wad-path directory map-name))
-         (scene (eldoom-render-scene-for-map map))
-         (_ (message "Map read"))
-         (player-start (seq-find (lambda (thing)
-                                   (= (ewd-thing-type thing) 1))
-                                 (ewd-map-things map)))
-         (max-render-time 0)
-         (last-time (eldoom--tic-time)))
-    (eldoom--with-game-buffer
-     (setq eldoom-globals-level-time 0
-           eldoom-globals-game-tic (random 256)
-           ewd-current-map map
-           eldoom--scene scene
-           eldoom-globals-difficulty :easy)
-     (eldoom-random-init)
-     (enf-init (ewd-map-sprites map))
-     (eth-init)
-     (eldoom-special-init map)
-     (emo-init-things map)
-     (eldoom--init-player-at-thing player-start)
-     (eac-init-actions enf-states)
-     (eldoom-user-init eldoom-player enf-states)
-     (etr-init)
-     (let ((left (window-pixel-left))
-           (top (window-pixel-top)))
-       (set-mouse-pixel-position (selected-frame) (+ left (/ eldoom-canvas-scaled-width 2))
-                                 (+ top (/ eldoom-canvas-scaled-height 2)))))
-    ;; (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
-    (garbage-collect)
-    (condition-case nil
-        (while (not eldoom-quitting)
-          (let* ((now (eldoom--tic-time))
-                 (tic-processed nil))
-
-            (eldoom--with-game-buffer
-             ;; 1. THE TIC LOOP (State Updates)
-             (while (< last-time now)
-               (eldoom--process-input)
-               (eldoom-user-update-player eldoom-player)
-               (eth-run-thinkers)
-               (eldoom-special-update)
-               (cl-incf eldoom-globals-level-time)
-               (cl-incf eldoom-globals-game-tic)
-               (cl-incf last-time)
-               (setq tic-processed t))
-
-             ;; 2. THE RENDER LOOP
-             ;; Only render if the game state actually advanced
-             (unless eldoom-quitting
-               (when tic-processed
-                 (let ((render-start (float-time)))
-                   (eldoom--render-view ewd-current-map scene eldoom-canvas)
-                   (setq max-render-time (max max-render-time (- (float-time) render-start)))
-                   (when (zerop (% eldoom-globals-level-time 20))
-                     (message "eldoom render: %.3fs %d,%d" max-render-time
-                              (emo-x-fx (emo-player-mobj eldoom-player))
-                              (emo-y-fx (emo-player-mobj eldoom-player)))
-                     (setq max-render-time 0))
-                   (eldoom-render eldoom-canvas)
-                   (redisplay t))))
-
-             (unless (eldoom--game-buffer-selected-p)
-               (eldoom--dispatch-selected-buffer-input))
-             ;; `sleep-for' yields without reading the input queue; `sit-for'
-             ;; would consume keys meant for the focused buffer.
-             (sleep-for 0.001))))
-      (quit
-       (eldoom-quit)))))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("ewd-" . "eldoom-wad-") ("emp-" . "eldoom-map-") ("emo-" . "eldoom-mobj-") ("enf-" . "eldoom-info-") ("eth-" . "eldoom-think-") ("etr-". "eldoom-trace-") ("eac-" . "eldoom-actor-"))
