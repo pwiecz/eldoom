@@ -109,8 +109,8 @@
         (define-key map (kbd "M-<SPC>") #'eldoom-use)
         (define-key map (kbd "S-<SPC>") #'eldoom-use)
         (define-key map (kbd "M-S-<SPC>") #'eldoom-use)
-        (define-key map (kbd "q") #'eldoom-quit)
-        (define-key map (kbd "C-g") #'eldoom-quit)
+        (define-key map (kbd "q") #'eldoom--keyboard-quit)
+        (define-key map (kbd "C-g") #'eldoom--keyboard-quit)
         (define-key map (kbd "C-x") ctl-x-map)
         (define-key map [mouse-movement] #'eldoom--mouse-move)
         (define-key map [down-mouse-1] #'eldoom--mouse-left-down)
@@ -122,6 +122,9 @@
         (define-key map [t] #'eldoom--handle-any-key)
         map))
 
+(defun eldoom--on-kill-buffer ()
+  (eldoom-quit))
+
 (define-derived-mode eldoom-mode special-mode "ELDooom"
   ;; Override local map to handle S+cursor key bindings, specified in windwmove-mode
   (setq-local overriding-local-map eldoom-mode-map
@@ -132,7 +135,7 @@
               mouse-highlight nil
               buffer-read-only t)
   (buffer-disable-undo)
-  (add-hook 'kill-buffer-hook #'eldoom-quit nil 'local))
+  (add-hook 'kill-buffer-hook #'eldoom--on-kill-buffer nil 'local))
 
 (defvar x-pointer-shape)     ;; declare those variables to silcence warnings
 (defvar x-pointer-invisible) ;; when compiling e.g. on Windows
@@ -162,9 +165,7 @@
   (eldoom-mode)
   (setq eldoom-canvas (eldoom-create-canvas eldoom-canvas-width eldoom-canvas-height)))
 
-
 (defun eldoom-quit ()
-  (interactive)
   (unless eldoom-quitting
     (message "Quitting eldoom")
     (setq eldoom-quitting t
@@ -181,7 +182,10 @@
       (kill-buffer eldoom-globals-buffer-name)
       (clear-image-cache))
     (setq debug-on-error nil)))
-;;(quit-window t)))
+
+(defun eldoom--keyboard-quit ()
+  (interactive)
+  (eldoom-quit))
 
 (defvar eldoom-wad-path nil
   "Default WAD path used by ELDoom test helpers.")
@@ -632,7 +636,6 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
 (defun eldoom ()
   (interactive)
   (eldoom-init)
-  (setq eldoom--max-render-time 0)
   (let* ((_ (message "Reading wad directory from %s" eldoom-wad-path))
          (directory (ewd-read-directory eldoom-wad-path))
          (map-name "MAP01")
