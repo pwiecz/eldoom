@@ -44,6 +44,7 @@
 (defvar-local eldoom--saved-mouse-color nil)
 (defvar-local eldoom--saved-x-pointer-shape nil)
 (defvar-local eldoom--timer nil)
+(defvar-local eldoom--render-timer nil)
 
 
 (defvar-local eldoom--mouse-preset-x nil)
@@ -164,6 +165,8 @@
           overriding-local-map nil)
     (when (timerp eldoom--timer)
       (cancel-timer eldoom--timer))
+    (when (timerp eldoom--render-timer)
+      (cancel-timer eldoom--render-timer))
     (when eldoom--saved-gc-cons-threshold
       (setq gc-cons-threshold eldoom--saved-gc-cons-threshold
             eldoom--saved-gc-cons-threshold nil))
@@ -504,23 +507,48 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
 
 (defvar-local eldoom--scene nil)
 
-(defun eldoom--tic ()
+(defvar-local eldoom--max-render-time 0)
+
+(defun eldoom--logic-tic ()
   (eldoom--with-game-buffer
    (unless (with-local-quit
-             (eldoom-user-update-player eldoom-player)
-             (eth-run-thinkers)
-             (eldoom-special-update)
+	     (eldoom-user-update-player eldoom-player)
+	     (eth-run-thinkers)
+	     (eldoom-special-update)	    
              (cl-incf eldoom-globals-level-time)
              (cl-incf eldoom-globals-game-tic)
-             (eldoom--render-view ewd-current-map eldoom--scene eldoom-canvas)
-             (eldoom-render eldoom-canvas)
-             (redisplay t)
              t)
+     (eldoom-quit))))
+
+(defconst eldoom--update-period (/ 1.0 eldoom-globals-tic-rate))
+
+(defun eldoom--render-tic ()
+  (eldoom--with-game-buffer
+   (unless
+       (with-local-quit
+	 (let ((render-start (float-time)))
+	   (eldoom--render-view ewd-current-map eldoom--scene eldoom-canvas)
+	   (eldoom-render eldoom-canvas)
+	   (redisplay t)
+	   (cl-callf max eldoom--max-render-time (- (float-time) render-start)))
+	 (when (zerop (% eldoom-globals-level-time 35))
+	   (message "eldoom render: %.3fs %d,%d"
+		    eldoom--max-render-time
+                    (emo-x-fx (emo-player-mobj eldoom-player))
+                    (emo-y-fx (emo-player-mobj eldoom-player)))
+	   (setq eldoom--max-render-time 0)
+	   (setq eldoom--max-logic-time 0))
+	 t
+	 (setq eldoom--render-timer
+	       (run-at-time eldoom--update-period nil #'eldoom--render-tic)))
      (eldoom-quit))))
 
 (defun eldoom ()
   (interactive)
   (eldoom-init)
+  (setq eldoom--max-render-time 0)
+  (setq eldoom--max-logic-time 0)
+  (setq eldoom--max-canvas-time 0)
   (let* ((_ (message "Reading wad directory from %s" eldoom-wad-path))
          (directory (ewd-read-directory eldoom-wad-path))
          (map-name "MAP01")
@@ -548,10 +576,10 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
      (etr-init))
     ;; (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
     (garbage-collect)
-    (when (timerp eldoom--timer)
-      (cancel-timer eldoom--timer))
+    (eldoom--logic-tic)
+    (eldoom--render-tic)
     (setq eldoom--timer
-          (run-at-time nil (/ 1.0 35.0) #'eldoom--tic))))
+          (run-at-time nil eldoom--update-period #'eldoom--logic-tic))))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("ewd-" . "eldoom-wad-") ("emp-" . "eldoom-map-") ("emo-" . "eldoom-mobj-") ("enf-" . "eldoom-info-") ("eth-" . "eldoom-think-") ("etr-". "eldoom-trace-") ("eac-" . "eldoom-actor-"))
