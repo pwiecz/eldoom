@@ -124,7 +124,8 @@
               mouse-fine-grained-tracking t
               cursor-type nil
               make-pointer-invisible t
-              mouse-highlight nil)
+              mouse-highlight nil
+              buffer-read-only t)
   (buffer-disable-undo)
   (add-hook 'kill-buffer-hook #'eldoom-quit nil 'local))
 
@@ -536,8 +537,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
 		    eldoom--max-render-time
                     (emo-x-fx (emo-player-mobj eldoom-player))
                     (emo-y-fx (emo-player-mobj eldoom-player)))
-	   (setq eldoom--max-render-time 0)
-	   (setq eldoom--max-logic-time 0))
+	   (setq eldoom--max-render-time 0))
 	 t
 	 (setq eldoom--render-timer
 	       (run-at-time eldoom--update-period nil #'eldoom--render-tic)))
@@ -547,8 +547,6 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
   (interactive)
   (eldoom-init)
   (setq eldoom--max-render-time 0)
-  (setq eldoom--max-logic-time 0)
-  (setq eldoom--max-canvas-time 0)
   (let* ((_ (message "Reading wad directory from %s" eldoom-wad-path))
          (directory (ewd-read-directory eldoom-wad-path))
          (map-name "MAP01")

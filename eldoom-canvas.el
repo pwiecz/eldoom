@@ -59,7 +59,6 @@
 
 (defun eldoom-render (canvas)
   (with-current-buffer eldoom-globals-buffer-name
-    (setq inhibit-read-only t)
     (let* ((image (eldoom-canvas--canvas-image canvas))
            (window (get-buffer-window (current-buffer))))
       
@@ -81,10 +80,11 @@
             (setf (image-property image :width) eldoom-canvas-scaled-width
                   (image-property image :height) eldoom-canvas-scaled-height))))
       
-      (erase-buffer)
-      (insert-image image)
+      (let ((buffer-read-only nil))
+        (erase-buffer)
+        (insert-image image))
       (image-flush image))
-    (setq inhibit-read-only nil)))
+    ))
 
 
 (provide 'eldoom-canvas)
