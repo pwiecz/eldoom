@@ -108,6 +108,7 @@
         (define-key map (kbd "M-S-<SPC>") #'eldoom-use)
         (define-key map (kbd "q") #'eldoom-quit)
         (define-key map (kbd "C-g") #'eldoom-quit)
+        (define-key map (kbd "C-x") ctl-x-map)
         (define-key map [mouse-movement] #'eldoom--mouse-move)
         (define-key map [down-mouse-1] #'eldoom--mouse-left-down)
         (define-key map [double-down-mouse-1] #'eldoom--mouse-left-down)
@@ -116,8 +117,7 @@
         map))
 
 (define-derived-mode eldoom-mode special-mode "ELDooom"
-  (setq-local overriding-local-map eldoom-mode-map
-              track-mouse t
+  (setq-local track-mouse t
               mouse-fine-grained-tracking t
               cursor-type nil
               make-pointer-invisible t
@@ -507,7 +507,6 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
              (eldoom--render-view ewd-current-map eldoom--scene eldoom-canvas)
              (eldoom-render eldoom-canvas)
              (redisplay t)
-             (sit-for 0.001)
              t)
      (eldoom-quit))))
 
