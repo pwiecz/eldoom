@@ -32,7 +32,7 @@
 (require 'eldoom-user)
 (require 'eldoom-wad)
 
-;; (byte-recompile-directory "~/src/eldoom" 0 t)
+;; (byte-recompile-directory (file-name-directory (or load-file-name (buffer-file-name))))
 
 (defvar-local eldoom-player nil)
 
