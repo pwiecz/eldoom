@@ -43,9 +43,7 @@
 (defvar-local eldoom--saved-gc-cons-threshold nil)
 (defvar-local eldoom--saved-mouse-color nil)
 (defvar-local eldoom--saved-x-pointer-shape nil)
-(defvar-local eldoom--timer nil)
-(defvar-local eldoom--render-timer nil)
-
+(defvar-local eldoom--tic-timer nil)
 
 (defvar-local eldoom--mouse-preset-x nil)
 (defvar-local eldoom--mouse-position-jitter 0)
@@ -171,10 +169,8 @@
     (message "Quitting eldoom")
     (setq eldoom-quitting t
           overriding-local-map nil)
-    (when (timerp eldoom--timer)
-      (cancel-timer eldoom--timer))
-    (when (timerp eldoom--render-timer)
-      (cancel-timer eldoom--render-timer))
+    (when (timerp eldoom--tic-timer)
+      (cancel-timer eldoom--tic-timer))
     (when eldoom--saved-gc-cons-threshold
       (setq gc-cons-threshold eldoom--saved-gc-cons-threshold
             eldoom--saved-gc-cons-threshold nil))
@@ -563,78 +559,74 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
 
 (defvar-local eldoom--scene nil)
 
-(defvar-local eldoom--max-render-time 0)
-
-(defun eldoom--logic-tic ()
-  (eldoom--with-game-buffer
-   (unless (with-local-quit
-             (when (< (- eldoom-globals-game-tic eldoom--forward-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-move-forward))
-             (when (< (- eldoom-globals-game-tic eldoom--forward-fast-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-move-forward-fast))
-             (when (< (- eldoom-globals-game-tic eldoom--backward-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-move-backward))
-             (when (< (- eldoom-globals-game-tic eldoom--backward-fast-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-move-backward-fast))
-             (when (< (- eldoom-globals-game-tic eldoom--turn-left-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-turn-left))
-             (when (< (- eldoom-globals-game-tic eldoom--turn-left-fast-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-turn-left-fast))
-             (when (< (- eldoom-globals-game-tic eldoom--turn-right-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-turn-right))
-             (when (< (- eldoom-globals-game-tic eldoom--turn-right-fast-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-turn-right-fast))
-             (when (< (- eldoom-globals-game-tic eldoom--strafe-right-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-strafe-right))
-             (when (< (- eldoom-globals-game-tic eldoom--strafe-right-fast-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-strafe-right-fast))
-             (when (< (- eldoom-globals-game-tic eldoom--strafe-left-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-strafe-left))
-             (when (< (- eldoom-globals-game-tic eldoom--strafe-left-fast-down-time)
-                      eldoom-globals-min-move-time-tics)
-               (eldoom-strafe-left-fast))
-             (when eldoom--mouse-left-down-p
-               (setf (eldoom-user-command-attack-button eldoom-user-cmd) t))
-
-	     (eldoom-user-update-player eldoom-player)
-	     (eth-run-thinkers)
-	     (eldoom-special-update)	    
-             (cl-incf eldoom-globals-level-time)
-             (cl-incf eldoom-globals-game-tic)
-             t)
-     (eldoom-quit))))
+(defvar-local eldoom--max-tic-time 0)
 
 (defconst eldoom--update-period (/ 1.0 eldoom-globals-tic-rate))
 
-(defun eldoom--render-tic ()
+(defun eldoom--tic ()
   (eldoom--with-game-buffer
-   (unless
-       (with-local-quit
-	 (let ((render-start (float-time)))
-	   (eldoom--render-view ewd-current-map eldoom--scene eldoom-canvas)
-	   (eldoom-render eldoom-canvas)
-	   (redisplay t)
-	   (cl-callf max eldoom--max-render-time (- (float-time) render-start)))
-	 (when (zerop (% eldoom-globals-level-time 35))
-	   (message "eldoom render: %.3fs %d,%d"
-		    eldoom--max-render-time
-                    (emo-x-fx (emo-player-mobj eldoom-player))
-                    (emo-y-fx (emo-player-mobj eldoom-player)))
-	   (setq eldoom--max-render-time 0))
-	 t
-	 (setq eldoom--render-timer
-	       (run-at-time eldoom--update-period nil #'eldoom--render-tic)))
+   (unless (with-local-quit
+             (let ((tic-start (float-time)))
+               (when (< (- eldoom-globals-game-tic eldoom--forward-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-move-forward))
+               (when (< (- eldoom-globals-game-tic eldoom--forward-fast-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-move-forward-fast))
+               (when (< (- eldoom-globals-game-tic eldoom--backward-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-move-backward))
+               (when (< (- eldoom-globals-game-tic eldoom--backward-fast-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-move-backward-fast))
+               (when (< (- eldoom-globals-game-tic eldoom--turn-left-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-turn-left))
+               (when (< (- eldoom-globals-game-tic eldoom--turn-left-fast-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-turn-left-fast))
+               (when (< (- eldoom-globals-game-tic eldoom--turn-right-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-turn-right))
+               (when (< (- eldoom-globals-game-tic eldoom--turn-right-fast-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-turn-right-fast))
+               (when (< (- eldoom-globals-game-tic eldoom--strafe-right-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-strafe-right))
+               (when (< (- eldoom-globals-game-tic eldoom--strafe-right-fast-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-strafe-right-fast))
+               (when (< (- eldoom-globals-game-tic eldoom--strafe-left-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-strafe-left))
+               (when (< (- eldoom-globals-game-tic eldoom--strafe-left-fast-down-time)
+                        eldoom-globals-min-move-time-tics)
+                 (eldoom-strafe-left-fast))
+               (when eldoom--mouse-left-down-p
+                 (setf (eldoom-user-command-attack-button eldoom-user-cmd) t))
+
+	       (eldoom-user-update-player eldoom-player)
+	       (eth-run-thinkers)
+	       (eldoom-special-update)	    
+	       (eldoom--render-view ewd-current-map eldoom--scene eldoom-canvas)
+	       (eldoom-render eldoom-canvas)
+	       (redisplay t)
+               (cl-incf eldoom-globals-level-time)
+               (cl-incf eldoom-globals-game-tic)
+               (let* ((elapsed (- (float-time) tic-start))
+                      (delay (max (- eldoom--update-period elapsed) 0.001))) ;; TODO: at least 1ms between timer calls
+	         (cl-callf max eldoom--max-tic-time elapsed)
+	         (when (zerop (% eldoom-globals-level-time 35))
+	           (message "eldoom tic: %.3fs %d,%d"
+		            eldoom--max-tic-time
+                            (emo-x-fx (emo-player-mobj eldoom-player))
+                            (emo-y-fx (emo-player-mobj eldoom-player)))
+	           (setq eldoom--max-tic-time 0))
+                 (unless quit-flag
+	           (setq eldoom--tic-timer (run-at-time delay nil #'eldoom--tic))))
+               t)
+             )
      (eldoom-quit))))
 
 (defun eldoom ()
@@ -668,10 +660,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
      (etr-init))
     ;; (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
     (garbage-collect)
-    (eldoom--logic-tic)
-    (eldoom--render-tic)
-    (setq eldoom--timer
-          (run-at-time nil eldoom--update-period #'eldoom--logic-tic))))
+    (eldoom--tic)))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("ewd-" . "eldoom-wad-") ("emp-" . "eldoom-map-") ("emo-" . "eldoom-mobj-") ("enf-" . "eldoom-info-") ("eth-" . "eldoom-think-") ("etr-". "eldoom-trace-") ("eac-" . "eldoom-actor-"))
