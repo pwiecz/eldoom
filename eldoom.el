@@ -125,15 +125,19 @@
   (buffer-disable-undo)
   (add-hook 'kill-buffer-hook #'eldoom-quit nil 'local))
 
+(defvar x-pointer-shape)     ;; declare those variables to silcence warnings
+(defvar x-pointer-invisible) ;; when compiling e.g. on Windows
+
 (defun eldoom-init ()
   (setq debug-on-error t)
   (unless eldoom--saved-gc-cons-threshold
     (setq eldoom--saved-gc-cons-threshold gc-cons-threshold))
   (unless eldoom--saved-mouse-color
     (setq eldoom--saved-mouse-color (alist-get 'mouse-color (frame-parameters))))
-  (unless eldoom--saved-x-pointer-shape
-    (setq eldoom--saved-x-pointer-shape x-pointer-shape))
-  (setq x-pointer-shape x-pointer-invisible)
+  (when (eq (window-system) 'x)
+    (unless eldoom--saved-x-pointer-shape
+      (setq eldoom--saved-x-pointer-shape x-pointer-shape))
+    (setq x-pointer-shape x-pointer-invisible))
   (if (and (stringp eldoom--saved-mouse-color) (string= eldoom--saved-mouse-color "yellow"))
       (set-mouse-color "#aaaaaa")
     (set-mouse-color "yellow")) ;; change mouse color to trigger applying new x-pointer-shape
@@ -160,7 +164,8 @@
     (when eldoom--saved-gc-cons-threshold
       (setq gc-cons-threshold eldoom--saved-gc-cons-threshold
             eldoom--saved-gc-cons-threshold nil))
-    (setq x-pointer-shape eldoom--saved-x-pointer-shape)
+    (when (eq (window-system) 'x)
+      (setq x-pointer-shape eldoom--saved-x-pointer-shape))
     (set-mouse-color eldoom--saved-mouse-color)
     (when (get-buffer eldoom-globals-buffer-name)
       (kill-buffer eldoom-globals-buffer-name)
