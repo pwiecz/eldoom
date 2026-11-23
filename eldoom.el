@@ -75,8 +75,8 @@
 (defun eldoom--handle-any-key ()
   (interactive))
 
-(defvar eldoom-mode-map nil)
-(setq eldoom-mode-map
+(defvar eldoom-mode-map;; nil)
+;;(setq eldoom-mode-map
       (let ((map (make-sparse-keymap)))
         (define-key map (kbd "<left>") #'eldoom-turn-left)
         (define-key map (kbd "a") #'eldoom-strafe-left)
@@ -117,7 +117,9 @@
         map))
 
 (define-derived-mode eldoom-mode special-mode "ELDooom"
-  (setq-local track-mouse t
+  ;; Override local map to handle S+cursor key bindings, specified in windwmove-mode
+  (setq-local overriding-local-map eldoom-mode-map
+              track-mouse t
               mouse-fine-grained-tracking t
               cursor-type nil
               make-pointer-invisible t
@@ -158,7 +160,8 @@
   (interactive)
   (unless eldoom-quitting
     (message "Quitting eldoom")
-    (setq eldoom-quitting t)
+    (setq eldoom-quitting t
+          overriding-local-map nil)
     (when (timerp eldoom--timer)
       (cancel-timer eldoom--timer))
     (when eldoom--saved-gc-cons-threshold
