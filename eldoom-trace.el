@@ -296,8 +296,8 @@ Returns non nil if we should stop checking"
                  (thing-bottom-slope (eldoom-math-div (- thing-bottom shoot-z) dist)))
             (when (and (>= thing-top-slope (etr--aim-state-bottom-slope aim-state))
                        (<= thing-bottom-slope (etr--aim-state-top-slope aim-state))) ;; shooting into the thing
-              (setq thing-top-slope (max thing-top-slope (etr--aim-state-top-slope aim-state))
-                    thing-bottom-slope (min thing-bottom-slope (etr--aim-state-bottom-slope aim-state)))
+              (setq thing-top-slope (min thing-top-slope (etr--aim-state-top-slope aim-state))
+                    thing-bottom-slope (max thing-bottom-slope (etr--aim-state-bottom-slope aim-state)))
               (setf (etr--aim-state-target aim-state) thing)
               (throw :aim-slope (/ (+ thing-top-slope thing-bottom-slope) 2)))))))))
 
