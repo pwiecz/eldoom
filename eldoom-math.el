@@ -21,7 +21,7 @@
 
 ;;; Code:
 
-(require 'cl-lib)
+(eval-when-compile (require 'cl-lib))
 (require 'gv)
 
 (defconst eldoom-math-bits 16

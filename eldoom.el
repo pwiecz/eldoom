@@ -8,9 +8,13 @@
 
 ;;; Commentary:
 
-;; Invoke (eldoom) to run Doom inside emacsd
+;; Invoke (eldoom) to run Doom inside emacs
 
 ;;; Code:
+
+(eval-when-compile (require 'cl-lib))
+(require 'profiler)
+(require 'seq)
 
 (require 'eldoom-actor)
 (require 'eldoom-canvas)
@@ -27,10 +31,6 @@
 (require 'eldoom-trace)
 (require 'eldoom-user)
 (require 'eldoom-wad)
-
-(eval-when-compile (require 'cl-lib))
-(require 'profiler)
-(require 'seq)
 
 ;; (byte-recompile-directory "~/src/eldoom" 0 t)
 

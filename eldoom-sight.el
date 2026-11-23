@@ -12,7 +12,8 @@
 
 ;;; Code:
 
-(require 'cl-lib)
+(eval-when-compile (require 'cl-lib))
+
 (require 'eldoom-globals)
 (require 'eldoom-info)
 (require 'eldoom-math)

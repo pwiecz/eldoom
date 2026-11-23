@@ -9,10 +9,11 @@
 
 ;;; Code
 
-(require 'cl-lib)
+(eval-when-compile (require 'cl-lib))
 (require 'bindat)
 (require 'generator)
 (require 'seq)
+
 (require 'eldoom-info)
 (require 'eldoom-math)
 

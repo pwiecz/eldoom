@@ -13,11 +13,12 @@
 
 ;;; Code:
 
-(require 'cl-lib)
+(eval-when-compile (require 'cl-lib))
+
 (require 'eldoom-math)
 (require 'eldoom-globals)
 (require 'eldoom-info)
-(require 'eldoom-intrusive)
+(eval-when-compile (require 'eldoom-intrusive))
 (require 'eldoom-map)
 (require 'eldoom-mobj)
 (require 'eldoom-phys)

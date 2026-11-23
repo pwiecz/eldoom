@@ -10,13 +10,13 @@
 
 ;;; Code:
 
-(require 'cl-lib)
+(eval-when-compile (require 'cl-lib))
 
 (require 'eldoom-canvas)
 (require 'eldoom-config)
 (require 'eldoom-globals)
 (require 'eldoom-info)
-(require 'eldoom-intrusive)
+(eval-when-compile (require 'eldoom-intrusive))
 (require 'eldoom-map)
 (require 'eldoom-math)
 (require 'eldoom-mobj)

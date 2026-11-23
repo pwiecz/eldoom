@@ -15,7 +15,7 @@
 (eval-when-compile (require 'cl-lib))
 
 (require 'eldoom-info)
-(require 'eldoom-intrusive)
+(eval-when-compile (require 'eldoom-intrusive))
 (require 'eldoom-map)
 (require 'eldoom-math)
 (require 'eldoom-mobj)
