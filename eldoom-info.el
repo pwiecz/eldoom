@@ -1,4 +1,4 @@
-;;; eldoom-info.el --- mobjinfo table per thing type -*- lexical-binding:t -*-
+;;; eldoom-info.el --- mobjinfo table per thing type -*- lexical-binding:t -*- 
 
 ;; Copyright (C) 2026 Piotr Wieczorek <pwiecz@gmail.com>
 
@@ -2108,7 +2108,9 @@
         enf-mobj-infos (enf--make-mobj-infos enf-states)
         enf-weapon-infos (enf--make-weapon-infos enf-states)))
 
+;; Do not try native compiling the code as it's exceeding variable tracking size limit.
 ;; Local Variables:
+;; no-native-compile: t
 ;; read-symbol-shorthands: (("enf-" . "eldoom-info-"))
 ;; End:
 (provide 'eldoom-info)
