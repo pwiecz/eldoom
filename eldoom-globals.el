@@ -23,6 +23,10 @@ more than once in one loop")
 (defvar-local eldoom-globals-difficulty :medium)
 (defvar-local eldoom-globals-fast-monsters nil)
 
+(defvar-local eldoom-globals-min-move-time-tics 15
+  "Emacs does not recognise key up events - prolong key press until the first
+repeat event starts, that is about half a second")
+
 (defconst eldoom-globals-melee-range (eldoom-math-fixed-from-int 64))
 (defconst eldoom-globals-missile-range (eldoom-math-fixed-from-int (* 32 64)))
 (defconst eldoom-globals-skull-speed (eldoom-math-fixed-from-int 20))
