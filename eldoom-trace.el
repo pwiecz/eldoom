@@ -312,7 +312,7 @@ Returns non nil if we should stop checking"
   (when (not etr--aim-state) (setq etr--aim-state (etr--make-aim-state)))
   (when (not etr--aim-result) (setq etr--aim-result (etr--make-aim-result)))
   (let ((x2 (+ (emo-x-fx mobj) (eldoom-math-mul distance (eldoom-math-cos angle))))
-        (y2 (+ (emo-y-fx mobj) (eldoom-math-mul distance (eldoom-math-cos angle)))))
+        (y2 (+ (emo-y-fx mobj) (eldoom-math-mul distance (eldoom-math-sin angle)))))
     (setf (etr--aim-state-shooter etr--aim-state) mobj
           (etr--aim-state-shoot-z etr--aim-state)
           (+ (emo-z-fx mobj) (/ (emo-height-fx mobj) 2) (eldoom-math-fixed-from-int 8))
