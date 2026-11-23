@@ -119,6 +119,9 @@
         (define-key map [mouse-1] #'eldoom--mouse-left-up)
         (define-key map [double-mouse-1] #'eldoom--mouse-left-up)
         (define-key map [triple-mouse-1] #'eldoom--mouse-left-up)
+        (define-key map [drag-mouse-1] #'eldoom--mouse-left-up)
+        (define-key map [double-drag-mouse-1] #'eldoom--mouse-left-up)
+        (define-key map [triple-drag-mouse-1] #'eldoom--mouse-left-up)
         (define-key map [t] #'eldoom--handle-any-key)
         map))
 
