@@ -698,7 +698,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
   (eldoom-init)
   (let* ((_ (message "Reading wad directory from %s" eldoom-wad-path))
          (directory (ewd-read-directory eldoom-wad-path))
-         (map-name "MAP01")
+         (map-name "MAP30")
          (_ (message "Reading map %s" map-name))
          (map (ewd-load-map eldoom-wad-path directory map-name))
          (scene (eldoom-render-scene-for-map map))
