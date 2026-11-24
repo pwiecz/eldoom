@@ -46,11 +46,17 @@
 (defvar-local eldoom--tic-timer nil)
 
 (defvar-local eldoom--mouse-preset-x nil)
-(defvar-local eldoom--mouse-position-jitter 0)
+(defvar-local eldoom--mouse-position-jitter 0 
+  "Alters arguments to set-mouse-pixel-position to prevent emacs from ignoring
+calls to the function")
 (defvar-local eldoom--mouse-sensitivity 5000000)
 
 (defun eldoom--mouse-move ()
   (interactive)
+  ;; TODO: calling mouse-pixel-position on each mouse movement event is pretty expensive
+  ;; and shows up prominently in the profiler output. Reading position from event coordinates
+  ;; may be cheaper, but requires translating one to the other to take into account
+  ;; window margins and such.
   (let* ((pos (mouse-pixel-position))
          (x (cadr pos))
          (y (cddr pos))
