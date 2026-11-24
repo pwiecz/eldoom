@@ -316,16 +316,16 @@ Otherwise sample only rows in [0, TEXTURE-HEIGHT) and skip nil."
           (ern--draw-pixel bitmap offset
                            (aref texture-column (mod (eldoom-math-fixed-to-int tex-y-fx) texture-height))
                            colormap palette)
-          (setq y (1+ y)
-                tex-y-fx (+ tex-y-fx tex-y-step-fx)
-                offset (+ offset stride)))
+          (cl-incf y)
+          (cl-incf tex-y-fx  tex-y-step-fx)
+          (cl-incf offset stride))
       (while (<= y draw-end)
         (let ((tex-y-int (eldoom-math-fixed-to-int tex-y-fx)))
           (when (and (>= tex-y-int 0) (< tex-y-int texture-height))
             (ern--draw-pixel bitmap offset (aref texture-column tex-y-int) colormap palette)))
-        (setq y (1+ y)
-              tex-y-fx (+ tex-y-fx tex-y-step-fx)
-              offset (+ offset stride))))))
+        (cl-incf y)
+        (cl-incf tex-y-fx tex-y-step-fx)
+        (cl-incf offset  stride)))))
 
 (defsubst ern--texture-world-top-z (wall-role upper-unpegged-p lower-unpegged-p
                                               near-ceiling near-floor far-ceiling far-floor
@@ -628,12 +628,14 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
   "Render all collected visplanes; flats horizontally and skies cylindrically."
   (declare (ftype (function (t array fixnum t
                                fixnum fixnum number number number number) t)))
-  (let ((projection-plane (ern--scene-projection-plane scene))
-        (sky-texture (ern--scene-sky-texture scene))
-        (center-x-fx (ern--scene-center-x scene))
-        (center-y-fx (ern--scene-center-y scene))
-        (colormaps (ern--scene-colormaps scene))
-        (visplane (ern--scene-visplane scene)))
+  (let* ((projection-plane (ern--scene-projection-plane scene))
+         (sky-texture (ern--scene-sky-texture scene))
+         (center-x-fx (ern--scene-center-x scene))
+         (center-y-fx (ern--scene-center-y scene))
+         (colormaps (ern--scene-colormaps scene))
+         (visplane (ern--scene-visplane scene))
+         (x-scale (eldoom-math-div sin-fx projection-plane))
+         (y-scale (eldoom-math-div cos-fx projection-plane)))
     (while visplane
       (let* ((vp visplane)
              (flat (ern--visplane-texture vp)))
@@ -675,7 +677,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                     (when (and (<= top bot) (/= top 10000))
                       (setq min-y (min min-y top)
                             max-y (max max-y bot))))
-                  (setq x (1+ x))))
+                  (cl-incf x)))
 
               ;; 2. Y-Axis Projection Loop
               (let ((y min-y))
@@ -691,8 +693,8 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                              (distance-fx (eldoom-math-mul plane-height-fx yslope-fx))
                              (colormap (ern--find-visplane-colormap scene light
                                                                     distance-fx extra-light))
-                             (fx-step (eldoom-math-mul distance-fx (eldoom-math-div sin-fx projection-plane)))
-                             (fy-step (eldoom-math-mul distance-fx (eldoom-math-div cos-fx projection-plane)))
+                             (fx-step (eldoom-math-mul distance-fx x-scale))
+                             (fy-step (eldoom-math-mul distance-fx y-scale))
                              (x min-x))
 
                         ;; 3. Span Extraction Loop
@@ -701,7 +703,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                           (while (and (<= x max-x)
                                       (or (< y (aref top-vector x))
                                           (> y (aref bottom-vector x))))
-                            (setq x (1+ x)))
+                            (cl-incf x))
 
                           (when (<= x max-x)
                             (let ((span-start x))
@@ -709,7 +711,7 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
                               (while (and (<= x max-x)
                                           (<= (aref top-vector x) y)
                                           (<= y (aref bottom-vector x)))
-                                (setq x (1+ x)))
+                                (cl-incf x))
                               (let ((span-end (1- x)))
 
                                 ;; Algebraic Step Jumping:
@@ -729,15 +731,15 @@ lines only ML_DONTPEGBOTTOM applies, anchoring the middle texture to the floor."
 
                                   (while (<= draw-x span-end)
                                     (let* ((color-offset (+ (logand (eldoom-math-fixed-to-int fx) 63)
-                                                            (* 64 (logand (eldoom-math-fixed-to-int fy) 63))))
+                                                            (ash (logand (eldoom-math-fixed-to-int fy) 63) 6)))
                                            (color-index (aref flat-data color-offset)))
                                       (ern--draw-pixel bitmap offset color-index colormap palette))
 
-                                    (setq draw-x (1+ draw-x)
-                                          offset (+ offset 3)
-                                          fx (+ fx fx-step)
-                                          fy (+ fy fy-step)))))))))))
-                  (setq y (1+ y)))))))))))
+                                    (cl-incf draw-x)
+                                    (cl-incf offset 3)
+                                    (cl-incf fx fx-step)
+                                    (cl-incf fy fy-step))))))))))
+                  (cl-incf y))))))))))
 
 (defun ern--make-xtoviewangle (center-x-fx projection-plane-fx)
   "Build Doom's xtoviewangle table: the BAM angle of each screen column.
