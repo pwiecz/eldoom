@@ -273,7 +273,6 @@ P_UseLines in p_map.c"
 (defun eldoom-user--a-lower (player sprite)
   "A_Lower in p_pspr.c"
   (cl-incf (eldoom-user-sprite-sy sprite) eldoom-user--lower-speed)
-  (message "A_Lower %d %d" (eldoom-user-sprite-sy sprite) eldoom-user--weapon-bottom)
   (cond
    ((< (eldoom-user-sprite-sy sprite) eldoom-user--weapon-bottom) nil)
    ((= (emo-player-state player) enf-PST_DEAD)
