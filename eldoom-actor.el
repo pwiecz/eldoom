@@ -480,7 +480,7 @@ Returns true if a player is targeted."
              (= (emo-tics mobj) -1)
              (enf-mobj-info-raise-state (emo-info mobj)))
     (let ((max-dist (+ (enf-mobj-info-radius-fx (emo-info mobj))
-                       (enf-mobj-info-radius-fx (aref enf-states enf-MT_VILE)))))
+                       (enf-mobj-info-radius-fx (aref enf-mobj-infos enf-MT_VILE)))))
       (when (and (<= (abs (- (emo-x-fx mobj) (eac--vile-check-state-try-x check-state)))
                      max-dist)
                  (<= (abs (- (emo-y-fx mobj) (eac--vile-check-state-try-y check-state)))
