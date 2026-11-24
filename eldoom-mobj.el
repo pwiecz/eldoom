@@ -248,9 +248,9 @@ Almost P_SpawnPlayer in p_mobj.c"
 
 (defun emo-explode-missile (missile)
   "P_ExplodeMissile in p_mobj.c"
-  (setf (emo-x-fx missile) 0
-        (emo-y-fx missile) 0
-        (emo-z-fx missile) 0)
+  (setf (emo-momx missile) 0
+        (emo-momy missile) 0
+        (emo-momz missile) 0)
   (emo-set-state missile (enf-mobj-info-death-state (emo-info missile)))
   (setf (emo-tics missile) (max (- (emo-tics missile) (logand (eldoom-random t) 3)) 1)
         (emo-flags missile) (eldoom-math-clear-flag (emo-flags missile) enf-MF_MISSILE)))
