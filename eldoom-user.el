@@ -350,7 +350,7 @@ P_UseLines in p_map.c"
         (setf angle (emo-angle mobj)
               (etr-aim-result-slope aim-result) 0)))
     (let* ((missile (emo-spawn-one (emo-x-fx mobj) (emo-y-fx mobj)
-                                   (+ (emo-z-fx (eldoom-math-fixed-from-int 32))) type))
+                                   (+ (emo-z-fx mobj) (eldoom-math-fixed-from-int 32)) type))
            (speed (enf-mobj-info-speed-fx (emo-info missile))))
       (setf (emo-target missile) mobj
             (emo-angle missile) angle
@@ -419,6 +419,16 @@ P_UseLines in p_map.c"
     (eldoom-user-set-sprite player :flash (enf-weapon-info-flash-state weapon-info))
     (cl-loop repeat 7 do
              (eldoom-user--gun-shot (emo-player-mobj player) slope nil))))
+
+(defun eldoom--a-open-shotgun2 (_player _state)
+  "A_OpenShotgun2 in p_pspr.c")
+
+(defun eldoom--a-load-shotgun2 (_player _state)
+  "A_LoadShotgun2 in p_pspr.c")
+
+(defun eldoom--a-close-shotgun2 (player state)
+  "A_CloseShotgun2 in p_pspr.c"
+  (eldoom-user--a-refire player state))
 
 (defun eldoom-user--a-fire-shotgun2 (player _state)
   "A_FireShotgun2 in p_pspr.c"
@@ -502,9 +512,12 @@ P_UseLines in p_map.c"
    ((string= name "A_FirePistol") #'eldoom-user--a-fire-pistol)
    ((string= name "A_FireShotgun") #'eldoom-user--a-fire-shotgun)
    ((string= name "A_FireShotgun2") #'eldoom-user--a-fire-shotgun2)
+   ((string= name "A_OpenShotgun2") #'eldoom--a-open-shotgun2)
+   ((string= name "A_LoadShotgun2") #'eldoom--a-load-shotgun2)
+   ((string= name "A_CloseShotgun2") #'eldoom--a-close-shotgun2)
    ((string= name "A_FireCGun") #'eldoom-user--a-fire-cgun)
    ((string= name "A_BFGSpray") #'eldoom-user--a-bfg-spray)
-   ((string= name "A_BFGSound") #'eldoom-user--a-bfg-sound)
+   ((string= name "A_BFGsound") #'eldoom-user--a-bfg-sound)
    ((string= name "A_ReFire") #'eldoom-user--a-refire)
    ((string= name "A_CheckReload") #'eldoom-user--a-check-reload)
    (t name)))
