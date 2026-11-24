@@ -457,25 +457,25 @@
     (cond
      ((or (= special ese-lt-blue-door)
           (= special ese-lt-blue-door-stay-open))
-      (when (not player)
-        (setq can-open nil))
-      (when (and (not (memq :blue-card cards)) (not (memq :blue-skull cards)))
-        (setf can-open nil
-              (emo-player-message player) "You need blue key to open this door")))
+      (if (not player)
+          (setq can-open nil)
+        (when (and (not (memq :blue-card cards)) (not (memq :blue-skull cards)))
+          (setf can-open nil
+                (emo-player-message player) "You need blue key to open this door"))))
      ((or (= special ese-lt-yellow-door)
           (= special ese-lt-yellow-door-stay-open))
-      (when (not player)
-        (setq can-open nil))
-      (when (and (not (memq :yellow-card cards)) (not (memq :yellow-skull cards)))
-        (setf can-open nil
-              (emo-player-message player) "You need yellow key to open this door")))
+      (if (not player)
+          (setq can-open nil)
+        (when (and (not (memq :yellow-card cards)) (not (memq :yellow-skull cards)))
+          (setf can-open nil
+                (emo-player-message player) "You need yellow key to open this door"))))
      ((or (= special ese-lt-red-door)
           (= special ese-lt-red-door-stay-open))
-      (when (not player)
-        (setq can-open nil))
-      (when (and (not (memq :red-card cards)) (not (memq :red-skull cards)))
-        (setf can-open nil
-              (emo-player-message player) "You need red key to open this door"))))
+      (if (not player)
+          (setq can-open nil)
+        (when (and (not (memq :red-card cards)) (not (memq :red-skull cards)))
+          (setf can-open nil
+                (emo-player-message player) "You need red key to open this door")))))
     (when can-open
       (if (and special-data
                (or (emo-player mobj)
