@@ -364,6 +364,13 @@ Returns true if a player is targeted."
     (eac--face-target mobj target)
     (eac--a-pain-shoot-skull mobj (emo-angle mobj))))
 
+(defun eac--a-pain-die (mobj)
+  "A_PainDie in p_enemy.c"
+  (eac--a-fall mobj)
+  (eac--a-pain-shoot-skull mobj (eldoom-math-angle-add (emo-angle mobj) eldoom-math-ang90))
+  (eac--a-pain-shoot-skull mobj (eldoom-math-angle-add (emo-angle mobj) eldoom-math-ang180))
+  (eac--a-pain-shoot-skull mobj (eldoom-math-angle-add (emo-angle mobj) eldoom-math-ang270)))
+
 (defun eac--a-chase (mobj)
   "A_Chase in p_enemy.c"
   (let ((target (emo-target mobj)))
@@ -731,6 +738,24 @@ Returns true if a player is targeted."
       (eph-teleport-move spawn (emo-x-fx spawn) (emo-y-fx spawn))
       (emo-remove mobj))))
 
+
+(defvar-local eac--live-keen-exists-p nil)
+
+(defun eac--look-for-live-keen (thinker keen)
+  (when (emo-p (eth-thinker-object thinker))
+    (let* ((mobj (eth-thinker-object thinker)))
+      (when (and (= (emo-type mobj) (emo-type keen))
+                 (> (emo-health mobj) 0))
+        (setq eac--live-keen-exists-p t)))))
+
+(defun eac--a-keen-die (mobj)
+  "A_KeenDie in p_enemy.c"
+  (eac--a-fall mobj)
+  (setq eac--live-keen-exists-p nil)
+  (eth-for-each-thinker #'eac--look-for-live-keen mobj)
+  (when eac--live-keen-exists-p
+    (ese-do-door (ewd--make-linedef :tag 666) :open)))
+
 (defun eac--a-spawn-sound (mobj)
   "A_SpawnSound in p_enemy.c"
   (eac--a-spawn-fly mobj))
@@ -790,6 +815,7 @@ Returns true if a player is targeted."
    ((string= name "A_BspiAttack") #'eac--a-bspi-attack)
    ((string= name "A_TroopAttack") #'eac--a-troop-attack)
    ((string= name "A_PainAttack") #'eac--a-pain-attack)
+   ((string= name "A_PainDie") #'eac--a-pain-die)
    ((string= name "A_SkullAttack") #'eac--a-skull-attack)
    ((string= name "A_Pain") #'eac--a-empty)
    ((string= name "A_Scream") #'eac--a-empty)
@@ -828,6 +854,7 @@ Returns true if a player is targeted."
    ((string= name "A_BruisAttack") #'eac--a-bruis-attack)
    ((string= name "A_Explode") #'eac--a-explode)
    ((string= name "A_BossDeath") #'eac--a-boss-death)
+   ((string= name "A_KeenDie") #'eac--a-keen-die)
    (t name)))
 
 (defun eac-init-actions (states)
