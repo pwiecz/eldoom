@@ -21,8 +21,7 @@
 (require 'eldoom-wad)
 
 (defun eldoom-sight--segments-intersect (seg1 seg2)
-  (declare (ftype (function (eldoom-math-segment eldoom-math-segment) boolean))
-           (side-effect-free t))
+  (declare (ftype (function (eldoom-math-segment eldoom-math-segment) boolean)) (pure t))
   (let ((s1-x1 (eldoom-math-segment-x1 seg1))
         (s1-y1 (eldoom-math-segment-y1 seg1))
         (s1-x2 (eldoom-math-segment-x2 seg1))

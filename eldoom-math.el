@@ -4,7 +4,7 @@
 
 ;; Author: Piotr Wieczorek <pwiecz@gmail.com>
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "24.3"))
+;; Package-Requires: ((emacs "25.1"))
 
 ;;; Commentary:
 
@@ -22,6 +22,7 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
+(eval-when-compile (require 'inline))
 (require 'gv)
 
 (defconst eldoom-math-bits 16
@@ -56,10 +57,11 @@
 (defconst eldoom-math-slope-range 2048 "SLOPERANGE: domain of `tantoangle'.")
 (defconst eldoom-math-slope-mask 2047)
 
-(defsubst eldoom-math-ang (a)
+(define-inline eldoom-math-ang (a)
   "Wrap integer A into the unsigned 32-bit BAM range."
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (logand a eldoom-math-ang-mask))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (a)
+    (inline-quote (logand ,a eldoom-math-ang-mask))))
 
 (defmacro eldoom-math-angle-incf (angle delta)
   "Increment ANGLE by DELTA using wrap around arithmetic so that the resulting
@@ -73,90 +75,105 @@ angle is between 0 and eldoom-math-and-max."
   (gv-letplace (getter setter) angle
     (funcall setter `(logand (- ,getter ,delta) eldoom-math-ang-mask))))
 
-(defsubst eldoom-math-angle-add (ang1 ang2)
+(define-inline eldoom-math-angle-add (ang1 ang2)
   "Add ANG2 to ANG1 using wrap around arithmetic so that the resulting
 angle is between 0 and eldoom-math-and-max"
-  (declare (ftype (function (fixnum fixnum) fixnum)) (side-effect-free t))
-  (eldoom-math-ang (+ ang1 ang2)))
+  (declare (ftype (function (fixnum fixnum) fixnum)) (pure t))
+  (inline-letevals (ang1 ang2)
+    (inline-quote (eldoom-math-ang (+ ,ang1 ,ang2)))))
 
-(defsubst eldoom-math-angle-sub (ang1 ang2)
+(define-inline eldoom-math-angle-sub (ang1 ang2)
   "Subtract ANG2 from ANG1 using wrap around arithmetic so that the resulting
 angle is between 0 and eldoom-math-and-max"
-  (declare (ftype (function (fixnum fixnum) fixnum)) (side-effect-free t))
-  (eldoom-math-ang (- ang1 ang2)))
+  (declare (ftype (function (fixnum fixnum) fixnum)) (pure t))
+  (inline-letevals (ang1 ang2)
+    (inline-quote (eldoom-math-ang (- ,ang1 ,ang2)))))
 
 ;; --- Fixed-point arithmetic -------------------------------------------------
 
-(defsubst eldoom-math-fixed-from-int (x)
+(define-inline eldoom-math-fixed-from-int (x)
   "Convert integer X to fixed-point."
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (ash x eldoom-math-bits))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (x)
+    (inline-quote (ash ,x eldoom-math-bits))))
 
-(defsubst eldoom-math-fixed-to-int (x)
+(define-inline eldoom-math-fixed-to-int (x)
   "Truncate fixed-point X toward negative infinity to an integer."
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (ash x (- eldoom-math-bits)))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (x)
+    (inline-quote (ash ,x (- eldoom-math-bits)))))
 
-(defsubst eldoom-math-fixed-from-float (x)
+(define-inline eldoom-math-fixed-from-float (x)
   "Convert float X to fixed-point."
-  (declare (ftype (function (number) fixnum)) (side-effect-free t))
-  (floor (* x eldoom-math-unit-f)))
+  (declare (ftype (function (number) fixnum)) (pure t))
+  (inline-letevals (x)
+    (inline-quote (floor (* ,x eldoom-math-unit-f)))))
 
-(defsubst eldoom-math-fixed-to-float (x)
+(define-inline eldoom-math-fixed-to-float (x)
   "Convert fixed-point X to a float."
-  (declare (ftype (function (fixnum) number)) (side-effect-free t))
-  (/ x eldoom-math-unit-f))
+  (declare (ftype (function (fixnum) number)) (pure t))
+  (inline-letevals (x)
+    (inline-quote  (/ ,x eldoom-math-unit-f))))
 
-(defsubst eldoom-math-fixed-ceil (x)
+(define-inline eldoom-math-fixed-ceil (x)
   "Round fixed-point X up to the next integer."
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (ash (+ x 65535) (- eldoom-math-bits)))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (x)
+    (inline-quote (ash (+ ,x 65535) (- eldoom-math-bits)))))
 
 ;; bam = radians / (2 pi) * 2^32
-(defsubst eldoom-math-radians-to-bam (radians)
+(define-inline eldoom-math-radians-to-bam (radians)
   "Convert RADIANS to an unsigned 32-bit BAM angle."
-  (declare (ftype (function (number) fixnum)) (side-effect-free t))
-  (eldoom-math-ang (round (* (/ radians (* 2.0 float-pi)) 4294967296.0))))
+  (declare (ftype (function (number) fixnum)) (pure t))
+  (inline-letevals (radians)
+    (inline-quote (eldoom-math-ang (round (* (/ ,radians (* 2.0 float-pi)) 4294967296.0))))))
 
 ;; bam = radians / 360 * 2^32
-(defsubst eldoom-math-degrees-to-bam (degrees)
+(define-inline eldoom-math-degrees-to-bam (degrees)
   "Convert RADIANS to an unsigned 32-bit BAM angle."
-  (declare (ftype (function (number) fixnum)) (side-effect-free t))
-  (eldoom-math-ang (round (* (/ degrees 360.0) 4294967296.0))))
+  (declare (ftype (function (number) fixnum)) (pure t))
+  (inline-letevals (degrees)
+    (inline-quote (eldoom-math-ang (round (* (/ ,degrees 360.0) 4294967296.0))))))
 
 ;; radians = bam * 2 pi / 2 ^ 32
-(defsubst eldoom-math-bam-to-radians (bam)
-  (declare (ftype (function (fixnum) number)) (side-effect-free t))
-  (/ (* bam 2.0 float-pi) 4294967296.0))
+(define-inline eldoom-math-bam-to-radians (bam)
+  (declare (ftype (function (fixnum) number)) (pure t))
+  (inline-letevals (bam)
+    (inline-quote (/ (* ,bam 2.0 float-pi) 4294967296.0))))
 
-(defsubst eldoom-math-bam-to-degrees (bam)
-  (declare (ftype (function (fixnum) number)) (side-effect-free t))
-  (/ (* (eldoom-math-bam-to-radians bam) 180) float-pi))
+(define-inline eldoom-math-bam-to-degrees (bam)
+  (declare (ftype (function (fixnum) number)) (pure t))
+  (inline-letevals (bam)
+    (inline-quote (/ (* (eldoom-math-bam-to-radians ,bam) 180) float-pi))))
 
-(defsubst eldoom-math-mul (a b)
+(define-inline eldoom-math-mul (a b)
   "Fixed-point multiply A by B (Doom FixedMul).
 Operands are split into 16-bit halves to avoid bignum allocation on the
 64-bit intermediate product."
-  (declare (ftype (function (fixnum fixnum) fixnum)) (side-effect-free t))
-  (let ((a-h (ash a -16))
-        (a-l (logand a 65535))
-        (b-h (ash b -16))
-        (b-l (logand b 65535)))
-    (+ (ash (* a-h b-h) 16)
-       (* a-h b-l)
-       (* a-l b-h)
-       (ash (* a-l b-l) -16))))
+  (declare (ftype (function (fixnum fixnum) fixnum)) (pure t))
+  (inline-letevals (a b)
+    (inline-quote
+     (let ((a-h (ash ,a -16))
+           (a-l (logand ,a 65535))
+           (b-h (ash ,b -16))
+           (b-l (logand ,b 65535)))
+       (+ (ash (* a-h b-h) 16)
+          (* a-h b-l)
+          (* a-l b-h)
+          (ash (* a-l b-l) -16))))))
 
-(defsubst eldoom-math-div (a b)
+(define-inline eldoom-math-div (a b)
   "Fixed-point divide A by B (Doom FixedDiv), saturating on overflow."
-  (declare (ftype (function (fixnum fixnum) fixnum)) (side-effect-free t))
-  (if (>= (ash (abs a) -14) (abs b))
-      (if (< (logxor a b) 0) eldoom-math-int-min eldoom-math-int-max)
-    ;; (a << 16) / b, truncating toward zero like the C double cast.
-    (let ((num (ash a 16)))
-      (if (< (logxor num b) 0)
-          (- (/ (- num) b))
-        (/ num b)))))
+  (declare (ftype (function (fixnum fixnum) fixnum)) (pure t))
+  (inline-letevals (a b)
+    (inline-quote
+     (if (>= (ash (abs ,a) -14) (abs ,b))
+         (if (< (logxor ,a ,b) 0) eldoom-math-int-min eldoom-math-int-max)
+       ;; (a << 16) / b, truncating toward zero like the C double cast.
+       (let ((num (ash ,a 16)))
+         (if (< (logxor num ,b) 0)
+             (- (/ (- num) ,b))
+           (/ num ,b)))))))
 
 ;; --- Trigonometric tables (generated at load, like Doom's tables.c) ---------
 
@@ -195,53 +212,65 @@ Operands are split into 16-bit halves to avoid bignum allocation on the
 
 ;; (defconst eldoom-math-finetan-offset (eldoom-math-radians-to-bam (/ float-pi 2)))
 
-(defsubst eldoom-math--fine-index (angle)
+(define-inline eldoom-math--fine-index (angle)
   "Fine-table index for BAM ANGLE."
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (logand (ash (eldoom-math-ang angle) eldoom-math-angle-to-fine-shift) eldoom-math-fine-mask))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (angle)
+    (inline-quote
+     (logand (ash (eldoom-math-ang ,angle) eldoom-math-angle-to-fine-shift) eldoom-math-fine-mask))))
 
-(defsubst eldoom-math-sin (angle)
+(define-inline eldoom-math-sin (angle)
   "Sine of BAM ANGLE as a fixed-point value."
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (aref eldoom-math--finesine (eldoom-math--fine-index angle)))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (angle)
+    (inline-quote (aref eldoom-math--finesine (eldoom-math--fine-index ,angle)))))
 
-(defsubst eldoom-math-cos (angle)
+(define-inline eldoom-math-cos (angle)
   "Cosine of BAM ANGLE as a fixed-point value."
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (aref eldoom-math--finesine (+ (eldoom-math--fine-index angle) eldoom-math--finecosine-offset)))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (angle)
+    (inline-quote
+     (aref eldoom-math--finesine (+ (eldoom-math--fine-index ,angle) eldoom-math--finecosine-offset)))))
 
-(defsubst eldoom-math--fine-tan-index (angle)
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (logand (ash (eldoom-math-ang (+ angle eldoom-math-ang90)) eldoom-math-angle-to-fine-shift) eldoom-math-fine-tan-mask))
+(define-inline eldoom-math--fine-tan-index (angle)
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (angle)
+    (inline-quote
+     (logand (ash (eldoom-math-ang (+ ,angle eldoom-math-ang90)) eldoom-math-angle-to-fine-shift)
+             eldoom-math-fine-tan-mask))))
 
-(defun eldoom-math-tan (angle)
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (aref eldoom-math--finetangent (eldoom-math--fine-tan-index angle)))
+(define-inline eldoom-math-tan (angle)
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (angle)
+    (inline-quote (aref eldoom-math--finetangent (eldoom-math--fine-tan-index ,angle)))))
 
-(defsubst eldoom-math-fine-cot-index (angle)
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
-  (logand (ash (eldoom-math-ang angle) eldoom-math-angle-to-fine-shift) eldoom-math-fine-tan-mask))
+(define-inline eldoom-math-fine-cot-index (angle)
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
+  (inline-letevals (angle)
+    (inline-quote
+     (logand (ash (eldoom-math-ang ,angle) eldoom-math-angle-to-fine-shift) eldoom-math-fine-tan-mask))))
 
 (defun eldoom-math-cot (angle)
-  (declare (ftype (function (fixnum) fixnum)) (side-effect-free t))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
   (- (aref eldoom-math--finetangent (eldoom-math-fine-cot-index angle))))
 
 ;; --- Angle/distance from coordinates (Doom r_main.c) ------------------------
 
-(defsubst eldoom-math--atan (dy dx)
+(define-inline eldoom-math--atan (dy dx)
   "Calculates arctan of dy/dx, where dy >= 0, dx > 0 and dx >= dy"
-  (declare (ftype (function (fixnum fixnum) fixnum)) (side-effect-free t))
-  (aref eldoom-math--tantoangle
-        ;; tantoangle array contains 2048 (2^11) values
-        ;; Note: this is more precise than the original SlopeDiv in the doom engine,
-        ;; which calculated ((dy << 3) / (dx >> 8)), to fit all the intermediate values
-        ;; within 32-bit wide integers.
-        (let ((ans (/ (ash dy 11) dx)))
-          (min ans eldoom-math-slope-range))))
+  (declare (ftype (function (fixnum fixnum) fixnum)) (pure t))
+  (inline-letevals (dy dx)
+    (inline-quote (aref eldoom-math--tantoangle
+                        ;; tantoangle array contains 2048 (2^11) values
+                        ;; Note: this is more precise than the original SlopeDiv in the doom engine,
+                        ;; which calculated ((dy << 3) / (dx >> 8)), to fit all the intermediate values
+                        ;; within 32-bit wide integers.
+                        (let ((ans (/ (ash ,dy 11) ,dx)))
+                          (min ans eldoom-math-slope-range))))))
 
 (defun eldoom-math-atan2 (dy dx)
   "BAM angle of the vector from (0,0) to (DX,DY)."
-  (declare (ftype (function (fixnum fixnum) fixnum)) (side-effect-free t))
+  (declare (ftype (function (fixnum fixnum) fixnum)) (pure t))
   (if (and (= dx 0) (= dy 0))
       0
     (if (>= dx 0)
@@ -266,7 +295,7 @@ Operands are split into 16-bit halves to avoid bignum allocation on the
 (defun eldoom-math-hypot (dx dy)
   "Calculates value of sqrt(DX*DX+DY*DY) using fixed point trigonometry
 instead of a square root."
-  (declare (ftype (function (fixnum fixnum) fixnum)) (side-effect-free t))
+  (declare (ftype (function (fixnum fixnum) fixnum)) (pure t))
   (setf dx (abs dx)
         dy (abs dy))
   (when (> dy dx)
@@ -278,20 +307,21 @@ instead of a square root."
 
 (defun eldoom-math-intercept-frac (x1 y1 dx1 dy1 x2 y2 dx2 dy2)
   "Fixed_t fraction along ray (X1,Y1)+T*(DX1,DY1) to line (X2,Y2)+S*(DX2,DY2)"
-  (declare (ftype (function (fixnum fixnum fixnum fixnum fixnum fixnum fixnum fixnum) fixnum)) (side-effect-free t))
+  (declare (ftype (function (fixnum fixnum fixnum fixnum fixnum fixnum fixnum fixnum) fixnum)) (pure t))
   (let ((den (- (eldoom-math-mul dx1 dy2) (eldoom-math-mul dy1 dx2))))
     (if (= 0 den)
         0
       (let ((num (- (eldoom-math-mul (- x2 x1) dy2) (eldoom-math-mul (- y2 y1) dx2))))
         (eldoom-math-div num den)))))
 
-(defsubst eldoom-math-has-flag (flags flag)
-  (declare (ftype (function (fixnum fixnum) boolean)) (side-effect-free t))
+(defun eldoom-math-has-flag (flags flag)
+  (declare (ftype (function (fixnum fixnum) boolean)) (pure t) (pure t))
   (/= 0 (logand flags flag)))
 
-(defsubst eldoom-math-clear-flag (flags flag)
-  (declare (ftype (function (fixnum fixnum) fixnum)) (side-effect-free t))
-  (logand flags (lognot flag)))
+(define-inline eldoom-math-clear-flag (flags flag)
+  (declare (ftype (function (fixnum fixnum) fixnum)) (pure t))
+  (inline-letevals (flags flag)
+    (inline-quote (logand ,flags (lognot ,flag)))))
 
 (defmacro eldoom-math-clear-flagf (flags flag)
   (gv-letplace (getter setter) flags
@@ -301,9 +331,10 @@ instead of a square root."
   (gv-letplace (getter setter) flags
     (funcall setter `(logior ,getter ,flag))))
 
-(defsubst eldoom-math-clamp (value min-value max-value)
-  (declare (ftype (function (fixnum fixnum fixnum) fixnum)) (side-effect-free t))
-  (max min-value (min value max-value)))
+(define-inline eldoom-math-clamp (value min-value max-value)
+  (declare (ftype (function (fixnum fixnum fixnum) fixnum)) (pure t))
+  (inline-letevals (value min-value max-value)
+    (inline-quote (max ,min-value (min ,value ,max-value)))))
 
 (cl-defstruct (eldoom-math-segment
                (:constructor eldoom-math-make-segment)
@@ -311,12 +342,13 @@ instead of a square root."
   (x1 0 :type fixnum) (y1 0 :type fixnum)
   (x2 0 :type fixnum) (y2 0 :type fixnum))
 
-(defsubst eldoom-math-cross (ax-fx ay-fx bx-fx by-fx)
-  (declare (ftype (function (fixnum fixnum fixnum fixnum) fixnum)) (side-effect-free t))
-  (- (eldoom-math-mul ax-fx by-fx) (eldoom-math-mul ay-fx bx-fx)))
+(define-inline eldoom-math-cross (ax-fx ay-fx bx-fx by-fx)
+  (declare (ftype (function (fixnum fixnum fixnum fixnum) fixnum)) (pure t))
+  (inline-letevals (ax-fx ay-fx bx-fx by-fx)
+    (inline-quote (- (eldoom-math-mul ,ax-fx ,by-fx) (eldoom-math-mul ,ay-fx ,bx-fx)))))
 
 (defun eldoom-math-point-segment-orientation (x y seg)
-  (declare (ftype (function (fixnum fixnum eldoom-math-segment) symbol)) (side-effect-free t))
+  (declare (ftype (function (fixnum fixnum eldoom-math-segment) symbol)) (pure t))
   (let ((x1 (eldoom-math-segment-x1 seg))
         (y1 (eldoom-math-segment-y1 seg))
         (x2 (eldoom-math-segment-x2 seg))
@@ -341,11 +373,11 @@ instead of a square root."
 
 
 (defun eldoom-math-on-right-side-p (x y seg)
-  (declare (ftype (function (fixnum fixnum eldoom-math-segment) boolean)) (side-effect-free t))
+  (declare (ftype (function (fixnum fixnum eldoom-math-segment) boolean)) (pure t))
   (eql (eldoom-math-point-segment-orientation x y seg) :right))
 
 (defun eldoom-math-segment-angle (seg)
-  (declare (ftype (function (eldoom-math-segment) fixnum)) (side-effect-free t))
+  (declare (ftype (function (eldoom-math-segment) fixnum)) (pure t))
   (let ((dx (- (eldoom-math-segment-x2 seg) (eldoom-math-segment-x1 seg)))
         (dy (- (eldoom-math-segment-y2 seg) (eldoom-math-segment-y1 seg))))
     (eldoom-math-atan2 dy dx)))
@@ -353,7 +385,7 @@ instead of a square root."
 (defun eldoom-math-ray-intersection-fraction (ray1 ray2)
   "Fraction along ray1 to ray2
 P_InterceptVector2 in p_sight.c and P_InterceptVector in p_maputl.c"
-  (declare (ftype (function (eldoom-math-segment eldoom-math-segment) fixnum)) (side-effect-free t))
+  (declare (ftype (function (eldoom-math-segment eldoom-math-segment) fixnum)) (pure t))
   (let* ((ray1-x1 (eldoom-math-segment-x1 ray1))
          (ray1-y1 (eldoom-math-segment-y1 ray1))
          (ray1-x2 (eldoom-math-segment-x2 ray1))
@@ -381,8 +413,7 @@ P_InterceptVector2 in p_sight.c and P_InterceptVector in p_maputl.c"
   (bottom 0 :type fixnum))
 
 (defun eldoom-math-line-intersects-bbox-p (line bbox)
-  (declare (ftype (function (eldoom-math-segment eldoom-math-bbox) boolean))
-           (side-effect-free t))
+  (declare (ftype (function (eldoom-math-segment eldoom-math-bbox) boolean)) (pure t))
   (let* ((x1 (eldoom-math-segment-x1 line))
          (y1 (eldoom-math-segment-y1 line))
          (dx (- (eldoom-math-segment-x2 line) x1))
@@ -407,8 +438,7 @@ P_InterceptVector2 in p_sight.c and P_InterceptVector in p_maputl.c"
 
 (defun eldoom-math-bboxes-intersect-p (bbox1 bbox2)
   "Return t iff BBOX1 and BBOX2 have non-empty intersection."
-  (declare (ftype (function (eldoom-math-bbox eldoom-math-bbox) boolean))
-           (side-effect-free t))
+  (declare (ftype (function (eldoom-math-bbox eldoom-math-bbox) boolean)) (pure t))
   (and (> (eldoom-math-bbox-right bbox1) (eldoom-math-bbox-left bbox2))
        (< (eldoom-math-bbox-left bbox1) (eldoom-math-bbox-right bbox2))
        (> (eldoom-math-bbox-top bbox1) (eldoom-math-bbox-bottom bbox2))
@@ -438,24 +468,28 @@ P_InterceptVector2 in p_sight.c and P_InterceptVector in p_maputl.c"
         (eldoom-math-view-transformation-sin transformation) (eldoom-math-sin angle)
         (eldoom-math-view-transformation-cos transformation) (eldoom-math-cos angle)))
 
-(defsubst eldoom-math-apply-view-transformation-x (transformation x y)
-  (declare (ftype (function (eldoom-math-view-transformation fixed fixed) fixed))
-           (side-effect-free t))
-  (+ (eldoom-math-mul (eldoom-math-view-transformation-cos transformation) 
-                      (- x (eldoom-math-view-transformation-x transformation)))
-     (eldoom-math-mul (eldoom-math-view-transformation-sin transformation) 
-                      (- y (eldoom-math-view-transformation-y transformation)))))
+(define-inline eldoom-math-apply-view-transformation-x (transformation x y)
+  (declare (ftype (function (eldoom-math-view-transformation fixed fixed) fixed)) (pure t))
+  (inline-letevals (transformation x y)
+    (inline-quote
+     (+ (eldoom-math-mul (eldoom-math-view-transformation-cos ,transformation) 
+                         (- ,x (eldoom-math-view-transformation-x ,transformation)))
+        (eldoom-math-mul (eldoom-math-view-transformation-sin ,transformation) 
+                         (- ,y (eldoom-math-view-transformation-y ,transformation)))))))
 
-(defsubst eldoom-math-apply-view-transformation-y (transformation x y)
-  (declare (ftype (function (eldoom-math-view-transformation fixed fixed) fixed))
-           (side-effect-free t))
-  (- (eldoom-math-mul (eldoom-math-view-transformation-cos transformation) 
-                      (- y (eldoom-math-view-transformation-y transformation)))
-     (eldoom-math-mul (eldoom-math-view-transformation-sin transformation)
-                      (- x (eldoom-math-view-transformation-x transformation)))))
+(define-inline eldoom-math-apply-view-transformation-y (transformation x y)
+  (declare (ftype (function (eldoom-math-view-transformation fixed fixed) fixed)) (pure t))
+  (inline-letevals (transformation x y)
+    (inline-quote
+     (- (eldoom-math-mul (eldoom-math-view-transformation-cos ,transformation) 
+                         (- ,y (eldoom-math-view-transformation-y ,transformation)))
+        (eldoom-math-mul (eldoom-math-view-transformation-sin ,transformation)
+                         (- ,x (eldoom-math-view-transformation-x ,transformation)))))))
 
-(defsubst eldoom-math-apply-view-transformation-z (transformation z)
-  (- z (eldoom-math-view-transformation-z transformation)))
+(define-inline eldoom-math-apply-view-transformation-z (transformation z)
+  (declare (ftype (function (eldoom-math-view-transformation fixed) fixed)) (pure t))
+  (inline-letevals (transformation z)
+    (inline-quote (- ,z (eldoom-math-view-transformation-z ,transformation)))))
 
 (cl-defstruct (eldoom-math-projection
                (:constructor eldoom-math-make-projection)
@@ -472,17 +506,19 @@ P_InterceptVector2 in p_sight.c and P_InterceptVector in p_maputl.c"
           (eldoom-math-projection-half-height projection) half-height
           (eldoom-math-projection-fov-scale projection) (eldoom-math-div half-width tan-half-fov))))
 
-(defsubst eldoom-math-apply-projection-x (projection x y)
-  (declare (ftype (function (eldoom-math-view-projection fixed fixed) fixed))
-           (side-effect-free t))
-  (- (eldoom-math-projection-half-width projection)
-     (eldoom-math-div (eldoom-math-mul x (eldoom-math-projection-fov-scale projection)) y)))
+(define-inline eldoom-math-apply-projection-x (projection x y)
+  (declare (ftype (function (eldoom-math-view-projection fixed fixed) fixed)) (pure t))
+  (inline-letevals (projection x y)
+    (inline-quote
+     (- (eldoom-math-projection-half-width ,projection)
+        (eldoom-math-div (eldoom-math-mul ,x (eldoom-math-projection-fov-scale ,projection)) ,y)))))
 
-(defsubst eldoom-math-apply-projection-z (projection z y)
-  (declare (ftype (function (eldoom-math-view-projection fixed fixed) fixed))
-           (side-effect-free t))
-  (- (eldoom-math-projection-half-height projection) 
-     (eldoom-math-div (eldoom-math-mul z (eldoom-math-projection-fov-scale projection)) y)))
+(define-inline eldoom-math-apply-projection-z (projection z y)
+  (declare (ftype (function (eldoom-math-view-projection fixed fixed) fixed)) (pure t))
+  (inline-letevals (projection z y)
+    (inline-quote
+     (- (eldoom-math-projection-half-height ,projection) 
+        (eldoom-math-div (eldoom-math-mul ,z (eldoom-math-projection-fov-scale ,projection)) y)))))
 
 (provide 'eldoom-math)
 

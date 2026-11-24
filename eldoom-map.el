@@ -4,13 +4,14 @@
 
 ;; Author: Piotr Wieczorek <pwiecz@gmail.com>
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "24.3"))
+;; Package-Requires: ((emacs "25.1"))
 
 ;;; Commentary:
 
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
+(eval-when-compile (require 'inline))
 
 (require 'eldoom-globals)
 (require 'eldoom-info)
@@ -20,10 +21,13 @@
 (defconst emp-block-units 128)
 (defconst emp-block-size (* emp-block-units eldoom-math-unit))
 
-(defsubst emp-point-in-right-child-p (node x-fx y-fx)
+(define-inline emp-point-in-right-child-p (node x-fx y-fx)
   "Returns true iff point is on the right side of node's partition line"
-  (eql (eldoom-math-point-segment-orientation x-fx y-fx (ewd-node-segment node))
-       :right))
+  (declare (ftype (function (ewd-linedef fixnum fixnum) boolean)) (pure t))
+  (inline-letevals (node x-fx y-fx)
+    (inline-quote
+     (eql (eldoom-math-point-segment-orientation ,x-fx ,y-fx (ewd-node-segment ,node))
+          :right))))
 
 (defun emp--subsector-at (node x y)
   "Find the subsector in NODE's tree containing X,Y."

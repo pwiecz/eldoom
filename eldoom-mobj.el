@@ -275,7 +275,8 @@ Almost P_SpawnPlayer in p_mobj.c"
      ((<= 9 damage 12) (emo-set-state mobj (aref enf-states enf-S_BLOOD2)))
      ((< damage 9) (emo-set-state mobj (aref enf-states enf-S_BLOOD3))))))
 
-(defsubst emo--difficulty-to-bit (difficulty)
+(defun emo--difficulty-to-bit (difficulty)
+  (declare (ftype (function (symbol) fixnum)) (pure t))
   (cl-ecase difficulty
     ((:baby :easy) 1)
     (:medium 2)

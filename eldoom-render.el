@@ -28,12 +28,12 @@
 (defsubst ern--bam-signed (delta)
   "Map an unsigned BAM angle DELTA to a signed value in [-2^31, 2^31).
 This is the BAM analogue of normalising an angle into (-pi, pi]."
-  (declare (ftype (function (fixnum) fixnum)))
+  (declare (ftype (function (fixnum) fixnum)) (pure t))
   (if (>= delta eldoom-math-ang180) (- delta eldoom-math-ang-max) delta))
 
 (defsubst ern--view-to-point-angle (x-fx y-fx px-fx py-fx)
   "BAM angle from view point (X,Y) towards map point (PX,PY)."
-  (declare (ftype (function (fixnum fixnum fixnum fixnum) fixnum)))
+  (declare (ftype (function (fixnum fixnum fixnum fixnum) fixnum)) (pure t))
   (eldoom-math-atan2 (- py-fx y-fx) (- px-fx x-fx)))
 
 (cl-defstruct (ern--scene
