@@ -409,8 +409,10 @@ P_LineAttack in p_map.c"
                  (y (+ y1 (eldoom-math-mul dy frac)))
                  (z (+ z1 (eldoom-math-mul slope (eldoom-math-mul frac distance)))))
             ;; TODO: handle shooting at the sky
-            (emo-spawn-puff x y z (= distance eldoom-globals-melee-range)))
-        (let* ((frac (- (etr-intercept-frac intercept)
+            (emo-spawn-puff x y z (= distance eldoom-globals-melee-range))
+            nil)
+        (let* ((target (etr-intercept-item intercept))
+               (frac (- (etr-intercept-frac intercept)
                         (eldoom-math-div (eldoom-math-fixed-from-int 10) distance)))
                (x (+ x1 (eldoom-math-mul dx frac)))
                (y (+ y1 (eldoom-math-mul dy frac)))
@@ -419,7 +421,8 @@ P_LineAttack in p_map.c"
               (emo-spawn-puff x y z (= distance eldoom-globals-melee-range))
             (emo-spawn-blood x y z damage))
           (when (/= 0 damage)
-            (emo-damage (etr-intercept-item intercept) mobj mobj damage)))))))
+            (emo-damage target mobj mobj damage))
+          target)))))
 
 (cl-defstruct (etr--radius-attack-state (:constructor etr--make-radius-attack-state)
                                         (:copier nil))
