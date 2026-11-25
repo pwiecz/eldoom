@@ -754,7 +754,7 @@ left of centre have positive (counter-clockwise) angles, like vanilla."
 (defun ern-scene-for-map (map)
   (let* ((half-fov (/ eldoom-fov 2.0))
          (projection-plane (/ (/ eldoom-canvas-width 2.0) (tan half-fov)))
-         (center-x-fx (eldoom-math-fixed-from-float (/ eldoom-canvas-width 2.0)))
+         (center-x-fx (/ (eldoom-math-fixed-from-int eldoom-canvas-width) 2))
          (projection-plane-fx (eldoom-math-fixed-from-float projection-plane))
          (scene
           (ern--make-scene
@@ -1537,7 +1537,6 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
   "R_DrawPSprite in r_things.c"
   (let* ((sprite (enf-state-sprite state))
          (patch (aref (aref sprite (enf-state-frame state)) 0))
-         (height (eldoom-math-fixed-from-int (ewd-patch-height patch)))
          (y-offset (eldoom-math-fixed-from-int (ewd-patch-y-offset patch)))
          (width (eldoom-math-fixed-from-int (ewd-patch-width patch)))
          (x-offset (eldoom-math-fixed-from-int (ewd-patch-x-offset patch)))
@@ -1547,11 +1546,8 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
          (tx (- (eldoom-user-sprite-sx psprite) (/ canvas-width 2) x-offset))
          (x1 (eldoom-math-fixed-to-int (+ center-x tx)))
          (x2 (1- (eldoom-math-fixed-to-int (+ center-x tx width))))
-         (y (- (+ (/ canvas-height 2)
-                  (eldoom-user-sprite-sy psprite))
-               y-offset
-               (/ height 2)
-               (* 40 eldoom-math-unit))) ;; TODO: remove this random offset by fixing formula for y
+         (y (+ (- (/ canvas-height 2) (/ eldoom-math-unit 2) y-offset (eldoom-math-fixed-from-int 68))
+               (eldoom-user-sprite-sy psprite))) ;; TODO: investigate where 68 is coming from
          (colormaps (ern--scene-colormaps scene))
          (fixed-colormap (emo-player-fixed-colormap player))
          (extra-light (emo-player-extra-light player))
@@ -1567,7 +1563,8 @@ there, which both bends the wall and corrupts sprite-vs-wall occlusion."
             (ern--vissprite-colormap vissprite) colormap
             (ern--vissprite-mobj-z vissprite) 0
             (ern--vissprite-texture-y-fx vissprite) y)
-      (ern--draw-vissprite vissprite nil bitmap data-offset palette))))
+      (ern--draw-vissprite vissprite nil bitmap data-offset palette))
+    (ern--vissprite-move-to-freelist vissprite)))
 
 (defun ern--draw-player-sprites (scene bitmap data-offset palette player)
   (let* ((sector (ewd-subsector-sector (emo-subsector (emo-player-mobj player))))
