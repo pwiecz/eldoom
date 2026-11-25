@@ -438,27 +438,31 @@ P_CheckMissileSpawn in p_mobj.c"
                 (setf (emo-momx mobj) 0
                       (emo-momy mobj) 0)))))))
     ;; apply friction
-    (let ((flags (emo-flags mobj)))
-      (when (and (not (eldoom-math-has-flag flags enf-MF_MISSILE))
-                 (not (eldoom-math-has-flag flags enf-MF_SKULLFLY))
-                 (<= (emo-z-fx mobj) (emo-floor-z mobj))
-                 ;; don't apply friction to corpse sliding over a step with some momentum
-                 (not (eph--fast-sliding-corpse-p mobj)))
-        (if (and (< (- eph--stop-speed) (emo-momx mobj) eph--stop-speed)
-                 (< (- eph--stop-speed) (emo-momy mobj) eph--stop-speed)
-                 (not (emo-player mobj))) ;; TODO: or player with no command move
-            (progn
-              (when (emo-player mobj)
-                (let ((state (emo-state mobj)))
-                  (when (or (eq state (aref enf-states enf-S_PLAY_RUN1))
-                            (eq state (aref enf-states enf-S_PLAY_RUN2))
-                            (eq state (aref enf-states enf-S_PLAY_RUN3))
-                            (eq state (aref enf-states enf-S_PLAY_RUN4)))
-                    (emo-set-state mobj (aref enf-states enf-S_PLAY)))))
-              (setf (emo-momx mobj) 0
-                    (emo-momy mobj) 0))
-          (setf (emo-momx mobj) (eldoom-math-mul (emo-momx mobj) eph--friction)
-                (emo-momy mobj) (eldoom-math-mul (emo-momy mobj) eph--friction)))))))
+    (if (and (emo-player mobj)
+             (eldoom-math-has-flag (emo-player-cheats (emo-player mobj)) eldoom-globals-CF_NOMOMENTUM))
+        (setf (emo-momx mobj) 0
+              (emo-momy mobj) 0)
+      (let ((flags (emo-flags mobj)))
+        (when (and (not (eldoom-math-has-flag flags enf-MF_MISSILE))
+                   (not (eldoom-math-has-flag flags enf-MF_SKULLFLY))
+                   (<= (emo-z-fx mobj) (emo-floor-z mobj))
+                   ;; don't apply friction to corpse sliding over a step with some momentum
+                   (not (eph--fast-sliding-corpse-p mobj)))
+          (if (and (< (- eph--stop-speed) (emo-momx mobj) eph--stop-speed)
+                   (< (- eph--stop-speed) (emo-momy mobj) eph--stop-speed)
+                   (not (emo-player mobj))) ;; TODO: or player with no command move
+              (progn
+                (when (emo-player mobj)
+                  (let ((state (emo-state mobj)))
+                    (when (or (eq state (aref enf-states enf-S_PLAY_RUN1))
+                              (eq state (aref enf-states enf-S_PLAY_RUN2))
+                              (eq state (aref enf-states enf-S_PLAY_RUN3))
+                              (eq state (aref enf-states enf-S_PLAY_RUN4)))
+                      (emo-set-state mobj (aref enf-states enf-S_PLAY)))))
+                (setf (emo-momx mobj) 0
+                      (emo-momy mobj) 0))
+            (setf (emo-momx mobj) (eldoom-math-mul (emo-momx mobj) eph--friction)
+                  (emo-momy mobj) (eldoom-math-mul (emo-momy mobj) eph--friction))))))))
 
 (defun eph-z-movement (mobj)
   "P_ZMovement in p_mobj.c"
