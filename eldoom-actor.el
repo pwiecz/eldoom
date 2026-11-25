@@ -497,7 +497,7 @@ Returns true if a player is targeted."
 (defun eac--a-vile-chase (mobj)
   "A_VileChase in p_enemy.c"
   (unless eac--vile-check-state (setq eac--vile-check-state (eac--make-vile-check-state)))
-  (when-let* 
+  (when-let*
       ((corpse-hit
         (catch :corpse-hit
           (when (/= (emo-move-direction mobj) eac--DI_NODIR)
@@ -510,7 +510,7 @@ Returns true if a player is targeted."
               (setf (eac--vile-check-state-try-x eac--vile-check-state) try-x
                     (eac--vile-check-state-try-y eac--vile-check-state) try-y
                     (eac--vile-check-state-obj eac--vile-check-state) mobj)
-              (emo-for-each-in-block-overlapping-bbox                 
+              (emo-for-each-in-block-overlapping-bbox
                (- try-x ewd-max-radius) (+ try-x ewd-max-radius)
                (- try-y ewd-max-radius) (+ try-y ewd-max-radius)
                #'eac--vile-check-callback eac--vile-check-state)
@@ -627,21 +627,20 @@ Returns true if a player is targeted."
   "A_FatAttack1 in p_enemy.c"
   (when-let* ((target (emo-target mobj)))
     (eac--face-target mobj target)
-    (emo-spawn-missile mobj target enf-MT_FATSHOT (- eac--fat-spread))
+    (emo-spawn-missile mobj target enf-MT_FATSHOT eac--fat-spread)
     (emo-spawn-missile mobj target enf-MT_FATSHOT 0)))
 
 (defun eac--a-fat-attack2 (mobj)
   "A_FatAttack2 in p_enemy.c"
   (when-let* ((target (emo-target mobj)))
     (eac--face-target mobj target)
-    (emo-spawn-missile mobj target enf-MT_FATSHOT eac--fat-spread)
+    (emo-spawn-missile mobj target enf-MT_FATSHOT (- eac--fat-spread))
     (emo-spawn-missile mobj target enf-MT_FATSHOT 0)))
 
 (defun eac--a-fat-attack3 (mobj)
   "A_FatAttack3 in p_enemy.c"
   (when-let* ((target (emo-target mobj)))
     (eac--face-target mobj target)
-    (emo-spawn-missile mobj target enf-MT_FATSHOT 0)
     (emo-spawn-missile mobj target enf-MT_FATSHOT (- (/ eac--fat-spread 2)))
     (emo-spawn-missile mobj target enf-MT_FATSHOT (/ eac--fat-spread 2))))
 
@@ -650,7 +649,7 @@ Returns true if a player is targeted."
 (defvar-local eth--boss-target-count 0)
 (defvar-local eth--boss-target-ix 0)
 (defun eac--find-boss-targets-callback (thinker _)
-  (when (and (emo-p (eth-thinker-object thinker)) 
+  (when (and (emo-p (eth-thinker-object thinker))
              (< eth--boss-target-count 32)
              (= (emo-type (eth-thinker-object thinker)) enf-MT_BOSSTARGET))
     (aset eth--boss-targets eth--boss-target-count (eth-thinker-object thinker))
@@ -777,7 +776,7 @@ Returns true if a player is targeted."
          (target (ewd-sector-sound-target sector)))
     (if (and target
              (eldoom-math-has-flag (eldoom-mobj-flags target) enf-MF_SHOOTABLE))
-        (progn 
+        (progn
           (setf (eldoom-mobj-target mobj) target)
           (when (or (not (eldoom-math-has-flag (eldoom-mobj-flags mobj) enf-MF_AMBUSH))
                     (eldoom-sight-check mobj target)
