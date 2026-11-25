@@ -754,7 +754,7 @@ Returns true if a player is targeted."
   (setq eac--live-keen-exists-p nil)
   (eth-for-each-thinker #'eac--look-for-live-keen mobj)
   (when eac--live-keen-exists-p
-    (ese-do-door (ewd--make-linedef :tag 666) :open)))
+    (ese-do-door (ewd--make-linedef :sector-tag 666) :open)))
 
 (defun eac--a-spawn-sound (mobj)
   "A_SpawnSound in p_enemy.c"
