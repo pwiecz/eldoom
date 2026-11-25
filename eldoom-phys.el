@@ -502,10 +502,10 @@ P_CheckMissileSpawn in p_mobj.c"
           (setf (emo-momz mobj) 0))
         (setf (emo-z-fx mobj) (- (emo-ceiling-z mobj) (emo-height-fx mobj)))
         (when (eldoom-math-has-flag flags enf-MF_SKULLFLY)
-          (setf (emo-momz mobj) (- (emo-momz mobj)))
-          (when (and (eldoom-math-has-flag flags enf-MF_MISSILE)
-                     (not (eldoom-math-has-flag flags enf-MF_NOCLIP)))
-            (emo-explode-missile mobj)))))))
+          (setf (emo-momz mobj) (- (emo-momz mobj))))
+        (when (and (eldoom-math-has-flag flags enf-MF_MISSILE)
+                   (not (eldoom-math-has-flag flags enf-MF_NOCLIP)))
+          (emo-explode-missile mobj))))))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("eph-" . "eldoom-phys-") ("emo-" . "eldoom-mobj-") ("ewd-" . "eldoom-wad-") ("emp-" . "eldoom-map-") ("enf-" . "eldoom-info-") ("etr-" . "eldoom-trace-"))
