@@ -351,7 +351,7 @@ Returns true if a player is targeted."
            (x (+ (emo-x-fx mobj) (eldoom-math-mul prestep (eldoom-math-cos angle))))
            (y (+ (emo-y-fx mobj) (eldoom-math-mul prestep (eldoom-math-sin angle))))
            (z (+ (emo-z-fx mobj) (eldoom-math-fixed-from-int 8)))
-           (lost-soul-mobj (emo-spawn-one x y z enf-MT_SKULL)))
+           (lost-soul-mobj (emo-spawn x y z enf-MT_SKULL)))
       (if (eph-try-move lost-soul-mobj x y)
           (progn
             (setf (emo-target lost-soul-mobj) (emo-target mobj))
@@ -423,8 +423,8 @@ Returns true if a player is targeted."
   "A_VileTarget in p_enemy.c"
   (when-let* ((target (emo-target mobj)))
     (eac--face-target mobj target)
-    (let ((fire (emo-spawn-one (emo-x-fx target) (emo-y-fx target) (emo-z-fx target)
-                               enf-MT_FIRE)))
+    (let ((fire (emo-spawn (emo-x-fx target) (emo-y-fx target) (emo-z-fx target)
+                           enf-MT_FIRE)))
       (setf (emo-tracer mobj) fire
             (emo-target fire) mobj
             (emo-tracer fire) target)
@@ -574,9 +574,9 @@ Returns true if a player is targeted."
   "A_Tracer in p_enemy.c"
   (when (zerop (logand eldoom-globals-game-tic 3))
     (emo-spawn-puff (emo-x-fx mobj) (emo-y-fx mobj) (emo-z-fx mobj) nil)
-    (let ((smoke (emo-spawn-one (- (emo-x-fx mobj) (emo-momx mobj))
-                                (- (emo-y-fx mobj) (emo-momy mobj))
-                                (emo-z-fx mobj) enf-MT_SMOKE)))
+    (let ((smoke (emo-spawn (- (emo-x-fx mobj) (emo-momx mobj))
+                            (- (emo-y-fx mobj) (emo-momy mobj))
+                            (emo-z-fx mobj) enf-MT_SMOKE)))
       (setf (emo-momz smoke) eldoom-math-unit
             (emo-tics smoke) (max 1 (- (emo-tics smoke) (logand (eldoom-random t) 3)))))
     (let ((dest (emo-tracer mobj)))
@@ -673,7 +673,7 @@ Returns true if a player is targeted."
            by (eldoom-math-fixed-from-int 8) do
            (let* ((y (- (emo-y-fx mobj) (eldoom-math-fixed-from-int 320)))
                   (z (+ 128 (eldoom-math-fixed-from-int (* 2 (eldoom-random t)))))
-                  (th (emo-spawn-one x y z enf-MT_ROCKET)))
+                  (th (emo-spawn x y z enf-MT_ROCKET)))
              (setf (emo-momz th) (* 512 (eldoom-random t)))
              (emo-set-state th (aref enf-states enf-S_BRAINEXPLODE1))
              (setf (emo-tics th) (max (- (emo-tics th) (logand (eldoom-random t) 7)) 1)))))
@@ -683,7 +683,7 @@ Returns true if a player is targeted."
   (let* ((x (* (- (eldoom-random t) (eldoom-random t)) 2048))
          (y (emo-y-fx mobj))
          (z (+ 128 (eldoom-math-fixed-from-int (* 2 (eldoom-random t)))))
-         (th (emo-spawn-one x y z enf-MT_ROCKET)))
+         (th (emo-spawn x y z enf-MT_ROCKET)))
     (setf (emo-momz th) (* 512 (eldoom-random t)))
     (emo-set-state th (aref enf-states enf-S_BRAINEXPLODE1))
     (setf (emo-tics th) (max (- (emo-tics th) (logand (eldoom-random t) 7)) 1))))
@@ -717,7 +717,7 @@ Returns true if a player is targeted."
   (cl-decf (emo-reaction-time mobj))
   (when (zerop (emo-reaction-time mobj))
     (let* ((target (emo-target mobj))
-           (_ (emo-spawn-one (emo-x-fx target) (emo-y-fx target) (emo-z-fx target) enf-MT_SPAWNFIRE))
+           (_ (emo-spawn (emo-x-fx target) (emo-y-fx target) (emo-z-fx target) enf-MT_SPAWNFIRE))
            (rand (eldoom-random t))
            (type
             (cond
@@ -732,7 +732,7 @@ Returns true if a player is targeted."
              ((< rand 222) enf-MT_FATSO)
              ((< rand 246) enf-MT_KNIGHT)
              (t enf-MT_BRUISER)))
-           (spawn (emo-spawn-one (emo-x-fx target) (emo-y-fx target) (emo-x-fx target) type)))
+           (spawn (emo-spawn (emo-x-fx target) (emo-y-fx target) (emo-z-fx target) type)))
       (when (eac--look-for-player spawn t)
         (emo-set-state spawn (enf-mobj-info-see-state (emo-info spawn))))
       (eph-teleport-move spawn (emo-x-fx spawn) (emo-y-fx spawn))

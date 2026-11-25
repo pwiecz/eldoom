@@ -348,8 +348,8 @@ P_UseLines in p_map.c"
       (unless (etr-aim-result-target aim-result)
         (setf angle (emo-angle mobj)
               (etr-aim-result-slope aim-result) 0)))
-    (let* ((missile (emo-spawn-one (emo-x-fx mobj) (emo-y-fx mobj)
-                                   (+ (emo-z-fx mobj) (eldoom-math-fixed-from-int 32)) type))
+    (let* ((missile (emo-spawn (emo-x-fx mobj) (emo-y-fx mobj)
+                               (+ (emo-z-fx mobj) (eldoom-math-fixed-from-int 32)) type))
            (speed (enf-mobj-info-speed-fx (emo-info missile))))
       (setf (emo-target missile) mobj
             (emo-angle missile) angle
@@ -468,8 +468,8 @@ P_UseLines in p_map.c"
       (eldoom-math-angle-incf angle (* (/ eldoom-math-ang90 40) i))
       (let ((aim-result (etr-aim-line-attack (emo-target mobj) angle eldoom-user--autoaim-distance)))
         (when-let* ((target (etr-aim-result-target aim-result)))
-          (emo-spawn-one (emo-x-fx target) (emo-y-fx target)
-                         (+ (emo-z-fx target) (/ (emo-height-fx target) 2)) enf-MT_EXTRABFG)
+          (emo-spawn (emo-x-fx target) (emo-y-fx target)
+                     (+ (emo-z-fx target) (/ (emo-height-fx target) 2)) enf-MT_EXTRABFG)
           (let ((damage 0))
             (cl-loop repeat 15 do
                      (cl-incf damage (eldoom-random-dice 1 8 t)))
@@ -637,7 +637,7 @@ P_UseLines in p_map.c"
         (eldoom-user--player-in-special-sector player))
       ;; TODO: handle buttons
       (when (eldoom-user-command-action-button eldoom-user-cmd)
-          (eldoom-user--use-lines mobj))
+        (eldoom-user--use-lines mobj))
       (eldoom-user--move-sprites player)
       (let ((powers (emo-player-powers player)))
         (when (/= 0 (aref powers eldoom-globals-pw_strength))

@@ -159,31 +159,29 @@
 (defun emo-add-spawn-function (func)
   (setq emo--spawn-functions (cons func emo--spawn-functions)))
 
-(defun emo-spawn-one (x-fx y-fx z info-index)
-  "P_SpawnMapThing in p_mobj.c"
+(defun emo-spawn (x y z info-index)
+  "P_SpawnMobj in p_mobj.c"
   (let* ((info (aref enf-mobj-infos info-index))
          (spawn-state (enf-mobj-info-spawn-state info))
          (mobj (emo--new-mobj)))
-    (setf (emo-x-fx mobj) x-fx
-          (emo-y-fx mobj) y-fx
-          (emo-reaction-time mobj) (if (eq eldoom-globals-difficulty :nightmare)
-                                       0
-                                     (enf-mobj-info-reaction-time info))
-          (emo-threshold mobj) 0
-          (emo-tics mobj) 0
+    (setf (emo-type mobj) info-index
+          (emo-info mobj) info
+          (emo-x-fx mobj) x
+          (emo-y-fx mobj) y
           (emo-radius-fx mobj) (enf-mobj-info-radius-fx info)
           (emo-height-fx mobj) (enf-mobj-info-height-fx info)
           (emo-flags mobj) (enf-mobj-info-flags info)
-          (emo-type mobj) info-index
           (emo-health mobj) (enf-mobj-info-spawn-health info)
+          (emo-reaction-time mobj) (if (eq eldoom-globals-difficulty :nightmare)
+                                       0
+                                     (enf-mobj-info-reaction-time info))
           (emo-state mobj) spawn-state
           (emo-tics mobj) (enf-state-tics spawn-state)
           (emo-sprite mobj) (enf-state-sprite spawn-state)
-          (emo-frame mobj) (enf-state-frame spawn-state)
-          (emo-info mobj) info)
+          (emo-frame mobj) (enf-state-frame spawn-state))
     (emo-set-position mobj)
-    (when-let* ((subsector (emo-subsector mobj))
-                (sector (ewd-subsector-sector subsector)))
+    (let* ((subsector (emo-subsector mobj))
+           (sector (ewd-subsector-sector subsector)))
       (setf (emo-floor-z mobj) (ewd-sector-floor-height-fx sector)
             (emo-ceiling-z mobj) (ewd-sector-ceiling-height-fx sector)))
     (setf (emo-z-fx mobj)
@@ -196,6 +194,28 @@
       (funcall func mobj))
     mobj))
 
+(defun emo--spawn-thing (thing)
+  "P_SpawnMapThing in p_mobj.c"
+  (when (and (> (ewd-thing-type thing) 4) (/= (ewd-thing-type thing) 11))
+    ;; don't spawn players or deathmatch starts
+    (let ((difficulty-bit (emo--difficulty-to-bit eldoom-globals-difficulty))
+          (flags (ewd-thing-flags thing)))
+      (when (and (not (eldoom-math-has-flag flags emo--multiplier-only))
+                 (eldoom-math-has-flag flags difficulty-bit))
+        (let* ((x (ewd-thing-x-fx thing))
+               (y (ewd-thing-y-fx thing))
+               (type (ewd-thing-type thing))
+               (index (enf-index-for-type enf-mobj-infos type))
+               (info (aref enf-mobj-infos index))
+               (z (if (eldoom-math-has-flag (enf-mobj-info-flags info) enf-MF_SPAWNCEILING)
+                      :on-ceiling :on-floor))
+               (mobj (emo-spawn x y z index)))
+          (when (> (emo-tics mobj) 0)
+            (setf (emo-tics mobj) (1+ (mod (eldoom-random t) (emo-tics mobj)))))
+          (setf (emo-angle mobj) (* eldoom-math-ang45 (/ (ewd-thing-angle-deg thing) 45)))
+          (when (eldoom-math-has-flag (ewd-thing-flags thing) enf-MTF_AMBUSH)
+            (eldoom-math-set-flagf (emo-flags mobj) enf-MF_AMBUSH)))))))
+
 (defconst emo--max-health 100)
 
 (defun emo-spawn-player (thing)
@@ -204,7 +224,7 @@ Almost P_SpawnPlayer in p_mobj.c"
   (let* ((x (ewd-thing-x-fx thing))
          (y (ewd-thing-y-fx thing))
          (z :on-floor)
-         (mobj (emo-spawn-one x y z enf-MT_PLAYER))
+         (mobj (emo-spawn x y z enf-MT_PLAYER))
          (player (emo--make-player :mobj mobj
                                    :state enf-PST_LIVE
                                    :view-height emo-view-height
@@ -229,9 +249,9 @@ Almost P_SpawnPlayer in p_mobj.c"
          (dest-x (emo-x-fx dest))
          (dest-y (emo-y-fx dest))
          (dest-z (emo-z-fx dest))
-         (missile (emo-spawn-one source-x source-y 
-                                 (+ source-z (eldoom-math-fixed-from-int 32))
-                                 type))
+         (missile (emo-spawn source-x source-y 
+                             (+ source-z (eldoom-math-fixed-from-int 32))
+                             type))
          (speed (enf-mobj-info-speed-fx (emo-info missile)))
          (angle (eldoom-math-angle-add (eldoom-math-atan2 (- dest-y source-y)
                                                           (- dest-x source-x))
@@ -258,7 +278,7 @@ Almost P_SpawnPlayer in p_mobj.c"
 (defun emo-spawn-puff (x y z punch-p)
   "P_SpawnPuff in p_mobj.c"
   (cl-incf z (ash (- (eldoom-random t) (eldoom-random t)) 10))
-  (let ((mobj (emo-spawn-one x y z enf-MT_PUFF)))
+  (let ((mobj (emo-spawn x y z enf-MT_PUFF)))
     (setf (emo-momz mobj) (eldoom-math-fixed-from-int 2)
           (emo-tics mobj) (max (- (emo-tics mobj) (logand (eldoom-random t) 3)) 1))
     ;; don't make punches spark on the wall
@@ -268,7 +288,7 @@ Almost P_SpawnPlayer in p_mobj.c"
 (defun emo-spawn-blood (x y z damage)
   "P_SpawnBlood in p_mobj.c"
   (cl-incf z (ash (- (eldoom-random t) (eldoom-random t)) 10))
-  (let ((mobj (emo-spawn-one x y z enf-MT_BLOOD)))
+  (let ((mobj (emo-spawn x y z enf-MT_BLOOD)))
     (setf (emo-momz mobj) (eldoom-math-fixed-from-int 2)
           (emo-tics mobj) (max (- (emo-tics mobj) (logand (eldoom-random t) 3)) 1))
     (cond
@@ -287,28 +307,12 @@ Almost P_SpawnPlayer in p_mobj.c"
 Spawn mobj_t for all collidable things on MAP. Fills mobj blockmap in map."
   (let* ((blockmap (ewd-map-blockmap map))
          (blockmap-length (length (ewd-blockmap-lines-blockmap blockmap)))
-         (mobj-blockmap (make-vector blockmap-length nil))
-         (difficulty-bit (emo--difficulty-to-bit eldoom-globals-difficulty)))
+         (mobj-blockmap (make-vector blockmap-length nil)))
     (dotimes (i blockmap-length)
       (aset mobj-blockmap i (emo--make)))
     (setf (ewd-blockmap-mobj-blockmap blockmap) mobj-blockmap)
     (cl-loop for thing across (ewd-map-things map) do
-             (let ((flags (ewd-thing-flags thing)))
-               (when (and (not (eldoom-math-has-flag flags emo--multiplier-only))
-                          (eldoom-math-has-flag flags difficulty-bit))
-                 (let* ((x (ewd-thing-x-fx thing))
-                        (y (ewd-thing-y-fx thing))
-                        (type (ewd-thing-type thing))
-                        (index (enf-index-for-type enf-mobj-infos type)))
-                   (when (and (> type 4) (/= type 11)) ;; don't spawn players or deathmatch starts here
-                     (cl-assert index)
-                     (let* ((info (aref enf-mobj-infos index))
-                            (z (if (eldoom-math-has-flag (enf-mobj-info-flags info) enf-MF_SPAWNCEILING)
-                                   :on-ceiling :on-floor))
-                            (mobj (emo-spawn-one x y z index)))
-                       (setf (emo-angle mobj) (* eldoom-math-ang45 (/ (ewd-thing-angle-deg thing) 45)))
-                       (when (eldoom-math-has-flag (ewd-thing-flags thing) enf-MTF_AMBUSH)
-                         (eldoom-math-set-flagf (emo-flags mobj) enf-MF_AMBUSH))))))))))
+             (emo--spawn-thing thing))))
 
 (defun emo--block-index (blockmap x-fx y-fx)
   (let* ((column-count (ewd-blockmap-column-count blockmap))
@@ -385,22 +389,21 @@ Place MOBJ in blockmap and sector lists."
 (defun emo-set-state (mobj state)
   "Returns not nil if mobj is still present (not removed)
 P_SetMobjState in p_mobj.c"
-  (not
-   (catch :removed
-     (while t
-       (when (not state)
-         (setf (emo-state mobj) nil)
-         (emo-remove mobj)
-         (throw :removed t))
-       (setf (emo-state mobj) state
-             (emo-tics mobj) (enf-state-tics state)
-             (emo-sprite mobj) (enf-state-sprite state)
-             (emo-frame mobj) (enf-state-frame state))
-       (when-let* ((action (enf-state-action state)))
-         (funcall action mobj))
-       (setq state (enf-state-next state))
-       (when (not (zerop (emo-tics mobj)))
-         (throw :removed nil))))))
+  (catch :return
+    (while t
+      (when (not state)
+        (setf (emo-state mobj) nil)
+        (emo-remove mobj)
+        (throw :return nil))
+      (setf (emo-state mobj) state
+            (emo-tics mobj) (enf-state-tics state)
+            (emo-sprite mobj) (enf-state-sprite state)
+            (emo-frame mobj) (enf-state-frame state))
+      (when-let* ((action (enf-state-action state)))
+        (funcall action mobj))
+      (setq state (enf-state-next state))
+      (when (/= 0 (emo-tics mobj))
+        (throw :return t)))))
 
 (defun emo-for-each-in-block (bx by fn obj)
   "Call FN with each mobj in given blockmap block
@@ -458,7 +461,7 @@ P_BlockThingsiterator in p_maputl.c"
                 ((or (= type enf-MT_WOLFSS) (= type enf-MT_POSSESSED)) enf-MT_CLIP)
                 ((= type enf-MT_SHOTGUY) enf-MT_SHOTGUN)
                 ((= type enf-MT_CHAINGUY) enf-MT_CHAINGUN))))
-    (let ((drop (emo-spawn-one (emo-x-fx target) (emo-y-fx target) :on-floor item)))
+    (let ((drop (emo-spawn (emo-x-fx target) (emo-y-fx target) :on-floor item)))
       (eldoom-math-set-flagf (emo-flags drop) enf-MF_DROPPED))))
 
 (defconst emo--base-threshold 100)
