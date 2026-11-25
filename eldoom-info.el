@@ -2080,7 +2080,7 @@
                   (enf--def-weapon-info eldoom-globals-am_shell enf-S_SGUNUP enf-S_SGUNDOWN
                                         enf-S_SGUN enf-S_SGUN1 enf-S_SGUNFLASH1)
                   (enf--def-weapon-info eldoom-globals-am_clip enf-S_CHAINUP enf-S_CHAINDOWN
-                                        enf-S_CHAIN enf-S_CHAIN enf-S_CHAINFLASH1)
+                                        enf-S_CHAIN enf-S_CHAIN1 enf-S_CHAINFLASH1)
                   (enf--def-weapon-info eldoom-globals-am_missile enf-S_MISSILEUP enf-S_MISSILEDOWN
                                         enf-S_MISSILE enf-S_MISSILE1 enf-S_MISSILEFLASH1)
                   (enf--def-weapon-info eldoom-globals-am_cell enf-S_PLASMAUP enf-S_PLASMADOWN
