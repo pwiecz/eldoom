@@ -27,7 +27,6 @@
 (defconst emo--default-monster-height-fx (eldoom-math-fixed-from-int 56))
 (defconst emo-view-height (eldoom-math-fixed-from-int 41))
 (defconst emo-float-speed (eldoom-math-fixed-from-int 4))
-(defconst emo-gravity (eldoom-math-fixed-from-int 1))
 
 (defvar-local emo-player-mobj nil)
 
@@ -95,7 +94,6 @@
   (threshold 0 :type fixnum)
   shooter
   thinker
-  (projectile-p nil)
   state
   (tics 0 :type fixnum)
   frame
@@ -145,12 +143,12 @@
           (emo-threshold mobj) 0
           (emo-shooter mobj) nil
           (emo-thinker mobj) nil
-          (emo-projectile-p mobj) nil
           (emo-state mobj) nil
           (emo-tics mobj) 0
           (emo-frame mobj) nil
           (emo-sprite mobj) nil
           (emo-info mobj) nil
+          (emo-on-pick-up mobj) nil
           (emo-freelist-next mobj) nil)
     mobj))
 
@@ -241,6 +239,11 @@ Almost P_SpawnPlayer in p_mobj.c"
     (aset (emo-player-weapon-owned player) eldoom-globals-wp_pistol t)
     player))
 
+(defvar-local emo--spawn-missile-functions nil)
+
+(defun emo-add-spawn-missile-function (func)
+  (setq emo--spawn-missile-functions (cons func emo--spawn-missile-functions)))
+
 (defun emo-spawn-missile (source dest type angle-delta)
   "P_SpawnMissile in p_mobj.c"
   (let* ((source-x (emo-x-fx source))
@@ -264,6 +267,8 @@ Almost P_SpawnPlayer in p_mobj.c"
           (emo-momx missile) (eldoom-math-mul speed (eldoom-math-cos angle))
           (emo-momy missile) (eldoom-math-mul speed (eldoom-math-sin angle))
           (emo-momz missile) (/ (- dest-z source-z) (max time-to-dest 1)))
+    (dolist (func emo--spawn-missile-functions)
+      (funcall func missile))
     missile))
 
 (defun emo-explode-missile (missile)
@@ -365,14 +370,6 @@ Place MOBJ in blockmap and sector lists."
     (unless (eldoom-math-has-flag (emo-flags mobj) enf-MF_NOSECTOR)
       (emo--link-sector mobj))))
 
-(defun emo-monster-p (mobj)
-  "Return non-nil if MOBJ is a shootable non-player monster."
-  (and mobj
-       (not (emo-player mobj))
-       (not (emo-projectile-p mobj))
-       (not (emo-removed-p mobj))
-       (eldoom-math-has-flag (emo-flags mobj) enf-MF_SHOOTABLE)))
-
 (defvar-local emo--remove-functions nil)
 
 (defun emo-add-remove-function (func)
@@ -418,8 +415,9 @@ P_BlockThingsiterator in p_maputl.c"
              (mobj-blockmap (ewd-blockmap-mobj-blockmap blockmap))
              (mobj (emo-block-next (aref mobj-blockmap blockmap-index))))
         (while mobj
-          (funcall fn mobj obj)
-          (setq mobj (emo-block-next mobj)))))))
+          (let ((mobj-next (emo-block-next mobj)))
+            (funcall fn mobj obj)
+            (setq mobj mobj-next)))))))
 
 (defun emo-for-each-in-block-overlapping-bbox (left right bottom top fn obj)
   "Call FN with each mobj in a blockmap block overlapping given bbox,

@@ -24,6 +24,7 @@
 (require 'eldoom-map)
 (require 'eldoom-math)
 (require 'eldoom-mobj)
+(require 'eldoom-phys)
 (require 'eldoom-random)
 (require 'eldoom-render)
 (require 'eldoom-special)
@@ -265,6 +266,7 @@ With an interactive prefix argument, prompt for FRAMES."
     (eac-init-actions enf-states)
     (eldoom-user-init eldoom-player enf-states)
     (etr-init)
+    (eph-init)
     (dotimes (_ warmup-frames)
       (eldoom-user-update-player eldoom-player)
       (eth-run-thinkers)
@@ -327,6 +329,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
     (eac-init-actions enf-states)
     (eldoom-user-init eldoom-player enf-states)
     (etr-init)
+    (eph-init)
     (cl-incf (emo-x-fx (emo-player-mobj eldoom-player)) (eldoom-math-fixed-from-int 550))
     (cl-incf (emo-y-fx (emo-player-mobj eldoom-player)) (eldoom-math-fixed-from-int 300))
     (eldoom-math-angle-incf (emo-angle (emo-player-mobj eldoom-player)) eldoom-math-ang90)
@@ -389,6 +392,7 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
     (eac-init-actions enf-states)
     (eldoom-user-init eldoom-player enf-states)
     (etr-init)
+    (eph-init)
     (let ((player-mobj (emo-player-mobj eldoom-player)))
       (cl-incf (emo-x-fx player-mobj) (eldoom-math-fixed-from-int 550))
       (cl-incf (emo-y-fx player-mobj) (eldoom-math-fixed-from-int 300))
@@ -720,13 +724,14 @@ PROFILER-TYPE defaults to `cpu'.  Use `mem' for memory profiling."
      (eldoom--init-player-at-thing player-start)
      (eac-init-actions enf-states)
      (eldoom-user-init eldoom-player enf-states)
-     (etr-init))
+     (etr-init)
+     (eph-init))
     ;; (eldoom-math-set-flagf (emo-player-cheats eldoom-player) eldoom-globals-CF_GODMODE)
     (garbage-collect)
     (eldoom--tic)))
 
 ;; Local Variables:
-;; read-symbol-shorthands: (("ewd-" . "eldoom-wad-") ("emp-" . "eldoom-map-") ("emo-" . "eldoom-mobj-") ("enf-" . "eldoom-info-") ("eth-" . "eldoom-think-") ("etr-". "eldoom-trace-") ("eac-" . "eldoom-actor-"))
+;; read-symbol-shorthands: (("ewd-" . "eldoom-wad-") ("emp-" . "eldoom-map-") ("emo-" . "eldoom-mobj-") ("enf-" . "eldoom-info-") ("eph-" . "eldoom-phys-") ("eth-" . "eldoom-think-") ("etr-". "eldoom-trace-") ("eac-" . "eldoom-actor-"))
 ;; End:
 (provide 'eldoom)
 ;;; eldoom.el ends here

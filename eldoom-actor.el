@@ -257,8 +257,7 @@ Returns true if a player is targeted."
     (if (eac--check-melee-range mobj)
         (let ((damage (eldoom-random-dice 3 8 t)))
           (emo-damage target mobj mobj damage))
-      (let ((missile (emo-spawn-missile mobj target enf-MT_TROOPSHOT 0)))
-        (eph-check-missile-spawn missile)))))
+      (emo-spawn-missile mobj target enf-MT_TROOPSHOT 0))))
 
 (defun eac--a-pos-attack (mobj)
   "A_PosAttack in p_enemy.c"
@@ -645,22 +644,22 @@ Returns true if a player is targeted."
     (emo-spawn-missile mobj target enf-MT_FATSHOT (/ eac--fat-spread 2))))
 
 
-(defvar-local eth--boss-targets nil)
-(defvar-local eth--boss-target-count 0)
-(defvar-local eth--boss-target-ix 0)
+(defvar-local eac--boss-targets nil)
+(defvar-local eac--boss-target-count 0)
+(defvar-local eac--boss-target-ix 0)
 (defun eac--find-boss-targets-callback (thinker _)
   (when (and (emo-p (eth-thinker-object thinker))
-             (< eth--boss-target-count 32)
+             (< eac--boss-target-count 32)
              (= (emo-type (eth-thinker-object thinker)) enf-MT_BOSSTARGET))
-    (aset eth--boss-targets eth--boss-target-count (eth-thinker-object thinker))
-    (cl-incf eth--boss-target-count)))
+    (aset eac--boss-targets eac--boss-target-count (eth-thinker-object thinker))
+    (cl-incf eac--boss-target-count)))
 
 (defun eac--a-brain-awake (_mobj)
   "A_BrainAwake in p_enemy.c"
-  (when (not eth--boss-targets) (setq eth--boss-targets (make-vector 32 nil)))
-  (setq eth--boss-target-count 0)
+  (when (not eac--boss-targets) (setq eac--boss-targets (make-vector 32 nil)))
+  (setq eac--boss-target-count 0)
   (eth-for-each-thinker #'eac--find-boss-targets-callback nil)
-  (setq eth--boss-target-ix 0))
+  (setq eac--boss-target-ix 0))
 
 (defun eac--a-brain-pain (_mobj)
   "A_BrainPain in p_enemy.c")
@@ -704,9 +703,9 @@ Returns true if a player is targeted."
   (cl-callf not eac--skip-brain-spit)
   (when (or (not (eq eldoom-globals-difficulty :easy))
             (not eac--skip-brain-spit))
-    (let* ((target (aref eth--boss-targets eth--boss-target-ix))
+    (let* ((target (aref eac--boss-targets eac--boss-target-ix))
            (spawn (emo-spawn-missile mobj target enf-MT_SPAWNSHOT 0)))
-      (setf eth--boss-target-ix (mod (1+ eth--boss-target-ix) eth--boss-target-count)
+      (setf eac--boss-target-ix (mod (1+ eac--boss-target-ix) eac--boss-target-count)
             (emo-target spawn) target
             (emo-reaction-time spawn) (/ (/ (- (emo-y-fx target) (emo-y-fx mobj)) (emo-momy spawn))
                                          (enf-state-tics (emo-state spawn)))))))

@@ -32,6 +32,8 @@
 
 (defconst eph--max-step-height-fx (eldoom-math-fixed-from-int 24))
 
+(defconst eph--gravity (eldoom-math-fixed-from-int 1))
+
 (defvar-local eph--tmfloorz-fx 0)
 (defvar-local eph--tmceilingz-fx 0)
 (defvar-local eph--tmdropoffz-fx 0)
@@ -109,8 +111,8 @@ PIT_CheckLine in p_map.c"
   "Part of PIT_CheckThing in p_map.c"
   (let ((damage (eldoom-random-dice (enf-mobj-info-damage (emo-info skull)) 8 t)))
     (emo-damage target skull skull damage)
-    (setf (emo-flags skull) (logand (emo-flags skull) (lognot enf-MF_SKULLFLY))
-          (emo-momx skull) 0
+    (eldoom-math-clear-flagf (emo-flags skull) enf-MF_SKULLFLY)
+    (setf (emo-momx skull) 0
           (emo-momy skull) 0
           (emo-momz skull) 0)
     (emo-set-state skull (enf-mobj-info-spawn-state (emo-info skull)))
@@ -236,7 +238,7 @@ Move MOBJ to fixed_t X,Y if legal; update x/y/z on success."
 (defun eph-check-missile-spawn (missile)
   "Moves the missile forward a bit and possibly explodes it right there.
 P_CheckMissileSpawn in p_mobj.c"
-  (setf (emo-tics missile) (max (- (emo-tics missile) (logand (eldoom-random t) 3)) 1))
+  (setf (emo-tics missile) (max 1 (- (emo-tics missile) (logand (eldoom-random t) 3))))
   (cl-incf (emo-x-fx missile) (/ (emo-momx missile) 2))
   (cl-incf (emo-y-fx missile) (/ (emo-momy missile) 2))
   (cl-incf (emo-z-fx missile) (/ (emo-momz missile) 2))
@@ -489,7 +491,8 @@ P_CheckMissileSpawn in p_mobj.c"
           (setf (emo-momz mobj) (- (emo-momz mobj))))
         (when (< (emo-momz mobj) 0)
           (when (and (emo-player mobj)
-                     (< (emo-momz mobj) (* emo-gravity -8)))
+                     (< (emo-momz mobj) (* eph--gravity -8)))
+            ;; Squat on landing
             (setf (emo-player-delta-view-height (emo-player mobj)) (ash (emo-momz mobj) -3)))
           (setf (emo-momz mobj) 0))
         (setf (emo-z-fx mobj) (emo-floor-z mobj))
@@ -499,8 +502,8 @@ P_CheckMissileSpawn in p_mobj.c"
           (throw :break t)))
        ((not (eldoom-math-has-flag flags enf-MF_NOGRAVITY))
         (if (zerop (emo-momz mobj))
-            (setf (emo-momz mobj) (* emo-gravity -2))
-          (cl-decf (emo-momz mobj) emo-gravity))))
+            (setf (emo-momz mobj) (* eph--gravity -2))
+          (cl-decf (emo-momz mobj) eph--gravity))))
       (when (> (+ (emo-z-fx mobj) (emo-height-fx mobj)) (emo-ceiling-z mobj))
         (when (> (emo-momz mobj) 0)
           (setf (emo-momz mobj) 0))
@@ -510,6 +513,9 @@ P_CheckMissileSpawn in p_mobj.c"
         (when (and (eldoom-math-has-flag flags enf-MF_MISSILE)
                    (not (eldoom-math-has-flag flags enf-MF_NOCLIP)))
           (emo-explode-missile mobj))))))
+
+(defun eph-init ()
+  (emo-add-spawn-missile-function #'eph-check-missile-spawn))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("eph-" . "eldoom-phys-") ("emo-" . "eldoom-mobj-") ("ewd-" . "eldoom-wad-") ("emp-" . "eldoom-map-") ("enf-" . "eldoom-info-") ("etr-" . "eldoom-trace-"))
