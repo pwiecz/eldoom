@@ -203,7 +203,8 @@ P_UseLines in p_map.c"
           (setf (emo-player-pending-weapon player) eldoom-globals-wp_bfg))
          (t 
           (setf (emo-player-pending-weapon player) eldoom-globals-wp_fist)))
-        (eldoom-user-set-sprite player :weapon (enf-weapon-info-down-state weapon-info))))))
+        (eldoom-user-set-sprite player :weapon (enf-weapon-info-down-state weapon-info)))
+      nil)))
 
 (defun eldoom-user-fire-weapon (player)
   "P_FireWeapon in p_pspr.c"
@@ -376,8 +377,8 @@ P_UseLines in p_map.c"
   (let* ((weapon-info (aref enf-weapon-infos (emo-player-ready-weapon player)))
          (ammo-type (enf-weapon-info-ammo weapon-info))
          (flash-state-index (enf-weapon-info-flash-state-index weapon-info)))
-    (cl-decf (aref (emo-player-ammo player) ammo-type) eldoom-user--bfg-cells)
-    (cl-incf flash-state-index (logand (eldoom-random 1) 1))
+    (cl-decf (aref (emo-player-ammo player) ammo-type))
+    (cl-incf flash-state-index (logand (eldoom-random t) 1))
     (eldoom-user-set-sprite player :flash (aref enf-states flash-state-index))
     (eldoom-user--spawn-player-missile (emo-player-mobj player) enf-MT_PLASMA)))
 
