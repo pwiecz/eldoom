@@ -236,6 +236,7 @@ Almost P_SpawnPlayer in p_mobj.c"
           (emo-player mobj) player
           (emo-health mobj) (emo-player-health player)
           emo-player-mobj mobj)
+    (aset (emo-player-weapon-owned player) eldoom-globals-wp_fist t)
     (aset (emo-player-weapon-owned player) eldoom-globals-wp_pistol t)
     player))
 

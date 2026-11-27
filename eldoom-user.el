@@ -45,7 +45,8 @@
   (forward-move 0 :type fixnum)
   (side-move 0 :type fixnum)
   (action-button nil :type boolean)
-  (attack-button nil :type boolean))
+  (attack-button nil :type boolean)
+  (weapon-change-button nil))
 
 (defun eldoom-user--calc-height (player)
   "P_CalcHeight in p_user.c"
@@ -635,7 +636,19 @@ P_UseLines in p_map.c"
       (eldoom-user--calc-height player)
       (when (/= 0 (ewd-sector-special (ewd-subsector-sector (emo-subsector mobj))))
         (eldoom-user--player-in-special-sector player))
-      ;; TODO: handle buttons
+      (when-let* ((weapon (eldoom-user-command-weapon-change-button eldoom-user-cmd)))
+        (when (and (= weapon eldoom-globals-wp_fist)
+                   (aref (emo-player-weapon-owned player) eldoom-globals-wp_chainsaw)
+                   (not (and  (= (emo-player-ready-weapon player) eldoom-globals-wp_chainsaw)
+                              (/= 0 (aref (emo-player-powers player) eldoom-globals-pw_strength)))))
+          (setq weapon eldoom-globals-wp_chainsaw))
+        (when (and (= weapon eldoom-globals-wp_shotgun)
+                   (aref (emo-player-weapon-owned player) eldoom-globals-wp_supershotgun)
+                   (/= (emo-player-ready-weapon player) eldoom-globals-wp_supershotgun))
+          (setq weapon eldoom-globals-wp_supershotgun))
+        (when (and (aref (emo-player-weapon-owned player) weapon)
+                   (/= weapon (emo-player-ready-weapon player)))
+          (setf (emo-player-pending-weapon player) weapon)))
       (when (eldoom-user-command-action-button eldoom-user-cmd)
         (eldoom-user--use-lines mobj))
       (eldoom-user--move-sprites player)
@@ -673,7 +686,8 @@ P_UseLines in p_map.c"
         (eldoom-user-command-forward-move eldoom-user-cmd) 0
         (eldoom-user-command-side-move eldoom-user-cmd) 0
         (eldoom-user-command-action-button eldoom-user-cmd) nil
-        (eldoom-user-command-attack-button eldoom-user-cmd) nil))
+        (eldoom-user-command-attack-button eldoom-user-cmd) nil
+        (eldoom-user-command-weapon-change-button eldoom-user-cmd) nil))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("enf-" . "eldoom-info-") ("emo-" . "eldoom-mobj-") ("eph-" . "eldoom-phys-") ("ese-" . "eldoom-sector-") ("etr-" . "eldoom-trace-") ("ewd-" . "eldoom-wad-"))
