@@ -877,27 +877,27 @@
     t))
 
 (defun eldoom-special--pick-up-health-bonus (player _pickup)
-  (setf (emo-player-health player) (max (1+ (emo-player-health player)) 200)
+  (setf (emo-player-health player) (min (1+ (emo-player-health player)) 200)
         (emo-health (emo-player-mobj player)) (emo-player-health player)
         (emo-player-message player) "Picked up a health bonus.")
   t)
 
 (defun eldoom-special--pick-up-armor-bonus (player _pickup)
-  (setf (emo-player-armor-points player) (max (1+ (emo-player-armor-points player)) 200)
+  (setf (emo-player-armor-points player) (min (1+ (emo-player-armor-points player)) 200)
         (emo-player-message player) "Picked up an armor bonus.")
   t)
 
 (defun eldoom-special--pick-up-soul-sphere (player _pickup)
-  (setf (emo-player-health player) (max (+ 100 (emo-player-health player)) 200)
+  (setf (emo-player-health player) (min (+ 100 (emo-player-health player)) 200)
         (emo-health (emo-player-mobj player)) (emo-player-health player)
         (emo-player-message player) "Supercharge!")
   t)
 
 (defun eldoom-special--pick-up-mega-sphere (player _pickup)
   (emo--give-armor player 2)
-  (setf(emo-player-health player) 200
-       (emo-health (emo-player-mobj player)) (emo-player-health player)
-       (emo-player-message player) "MegaSphere!")
+  (setf (emo-player-health player) 200
+        (emo-health (emo-player-mobj player)) (emo-player-health player)
+        (emo-player-message player) "MegaSphere!")
   t)
 
 (defun eldoom-special--pick-up-blue-keycard (player _pickup)
