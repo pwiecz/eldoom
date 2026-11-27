@@ -144,7 +144,7 @@ Returns non nil if we should stop checking"
 
 (defvar-local etr--mobj-bbox nil)
 (defvar-local etr--mobj-segment nil)
-(defun etr--add-thing-intercepts (mobj _)
+(defun etr--add-thing-intercepts (mobj)
   "PIT_AddThingIntercepts in p_maputl.c"
   (when (not etr--mobj-bbox) (setf etr--mobj-bbox (eldoom-math-make-bbox)))
   (when (not etr--mobj-segment) (setf etr--mobj-segment (eldoom-math-make-segment)))
@@ -233,7 +233,8 @@ Returns non nil if we should stop checking"
                      (when (eldoom-math-has-flag flags etr-pt-addlines)
                        (emp-for-each-line-in-block blockmap xt1 yt1 #'etr--add-line-intercepts))
                      (when (eldoom-math-has-flag flags etr-pt-addthings)
-                       (emo-for-each-in-block xt1 yt1 #'etr--add-thing-intercepts nil))
+                       (emo-for-each-in-block mobj xt1 yt1 do
+                                              (etr--add-thing-intercepts mobj)))
                      (when (and (= xt1 xt2) (= yt1 yt2))
                        (throw :break t))
                      (cond
@@ -424,41 +425,26 @@ P_LineAttack in p_map.c"
             (emo-damage target mobj mobj damage))
           target)))))
 
-(cl-defstruct (etr--radius-attack-state (:constructor etr--make-radius-attack-state)
-                                        (:copier nil))
-  spot
-  source
-  (damage 0 :type fixnum))
-
-(defun etr--radius-attack-callback (mobj attack-state)
+(defun etr--radius-attack-callback (mobj spot source damage)
   "PIT_RadiusAttack in p_map.c"
   (when (and (eldoom-math-has-flag (emo-flags mobj) enf-MF_SHOOTABLE)
              (/= (emo-type mobj) enf-MT_CYBORG)
              (/= (emo-type mobj) enf-MT_SPIDER))
-    (let ((spot (etr--radius-attack-state-spot attack-state))
-          (source (etr--radius-attack-state-source attack-state))
-          (damage (etr--radius-attack-state-damage attack-state)))
-      (let* ((dx (abs (- (emo-x-fx mobj) (emo-x-fx spot))))
-             (dy (abs (- (emo-y-fx mobj) (emo-y-fx spot))))
-             (dist (max (eldoom-math-fixed-to-int (- (max dx dy) (emo-radius-fx mobj)))
-                        0)))
-        (when (and (< dist damage)
-                   (eldoom-sight-check mobj spot))
-          (emo-damage mobj spot source (- damage dist)))))))
+    (let* ((dx (abs (- (emo-x-fx mobj) (emo-x-fx spot))))
+           (dy (abs (- (emo-y-fx mobj) (emo-y-fx spot))))
+           (dist (max (eldoom-math-fixed-to-int (- (max dx dy) (emo-radius-fx mobj)))
+                      0)))
+      (when (and (< dist damage)
+                 (eldoom-sight-check mobj spot))
+        (emo-damage mobj spot source (- damage dist))))))
 
-(defvar-local etr--radius-attack-state nil)
 (defun etr-radius-attack (spot source damage)
   "P_RadiusAttack in p_map.c"
-  (unless etr--radius-attack-state
-    (setq etr--radius-attack-state (etr--make-radius-attack-state)))
-  (setf (etr--radius-attack-state-spot etr--radius-attack-state) spot
-        (etr--radius-attack-state-source etr--radius-attack-state) source
-        (etr--radius-attack-state-damage etr--radius-attack-state) damage)
   (let* ((dist (eldoom-math-fixed-from-int damage)))
     (emo-for-each-in-block-overlapping-bbox
-     (- (emo-x-fx spot) dist) (+ (emo-x-fx spot) dist)
-     (- (emo-y-fx spot) dist) (+ (emo-y-fx spot) dist)
-     #'etr--radius-attack-callback etr--radius-attack-state)))
+        mobj (- (emo-x-fx spot) dist) (+ (emo-x-fx spot) dist)
+        (- (emo-y-fx spot) dist) (+ (emo-y-fx spot) dist) do
+        (etr--radius-attack-callback mobj spot source damage))))
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("etr-" . "eldoom-trace-") ("emo-" . "eldoom-mobj-") ("emp-" . "eldoom-map-") ("ewd-" . "eldoom-wad-") ("enf-" . "eldoom-info-"))

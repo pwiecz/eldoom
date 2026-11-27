@@ -403,36 +403,50 @@ P_SetMobjState in p_mobj.c"
       (when (/= 0 (emo-tics mobj))
         (throw :return t)))))
 
-(defun emo-for-each-in-block (bx by fn obj)
-  "Call FN with each mobj in given blockmap block
-passing OBJ as the second argument.
-P_BlockThingsiterator in p_maputl.c"
-  (let ((blockmap (ewd-map-blockmap ewd-current-map)))
-    (when (and (<= 0 bx)
-               (< bx (ewd-blockmap-column-count blockmap))
-               (<= 0 by)
-               (< by (ewd-blockmap-row-count blockmap)))
-      (let* ((blockmap-index (emp-blockmap-index blockmap bx by))
-             (mobj-blockmap (ewd-blockmap-mobj-blockmap blockmap))
-             (mobj (emo-block-next (aref mobj-blockmap blockmap-index))))
-        (while mobj
-          (let ((mobj-next (emo-block-next mobj)))
-            (funcall fn mobj obj)
-            (setq mobj mobj-next)))))))
+(defmacro emo-for-each-in-block (var bx by _do &rest body)
+  "Evaluate BODY with VAR bound to things in blockmap block BX, BY.
+P_BlockThingsiterator in p_maputl.c
 
-(defun emo-for-each-in-block-overlapping-bbox (left right bottom top fn obj)
-  "Call FN with each mobj in a blockmap block overlapping given bbox,
- passing OBJ as the second argument."
-  (let* ((blockmap (ewd-map-blockmap ewd-current-map))
-         (origin-x (ewd-blockmap-origin-x-fx blockmap))
-         (origin-y (ewd-blockmap-origin-y-fx blockmap))
-         (bl (ash (- left origin-x ewd-max-radius) ewd-map-block-shift))
-         (br (ash (+ (- right origin-x) ewd-max-radius) ewd-map-block-shift))
-         (bb (ash (- bottom origin-y ewd-max-radius) ewd-map-block-shift))
-         (bt (ash (+ (- top origin-y) ewd-max-radius) ewd-map-block-shift)))
-    (cl-loop for bx from bl to br do
-             (cl-loop for by from bb to bt do
-                      (emo-for-each-in-block bx by fn obj)))))
+\(fn VAR BX BY do BODY...)"
+  (declare (indent 1))
+  (let ((x (gensym "x-"))
+        (y (gensym "y-"))
+        (blockmap (gensym "blockmap-"))
+        (var-next (gensym "var-next-")))
+  `(let ((,blockmap (ewd-map-blockmap ewd-current-map))
+         (,x ,bx)
+         (,y ,by))
+    (when (and (<= 0 ,x) (< ,x (ewd-blockmap-column-count ,blockmap))
+               (<= 0 ,y) (< ,y (ewd-blockmap-row-count ,blockmap)))
+      (let* ((,var (emo-block-next (aref (ewd-blockmap-mobj-blockmap ,blockmap)
+                                         (emp-blockmap-index ,blockmap ,x ,y)))))
+        (while ,var
+          (let ((,var-next (emo-block-next ,var)))
+            (progn ,@body)
+            (setq ,var ,var-next))))))))
+
+(defmacro emo-for-each-in-block-overlapping-bbox (var left right bottom top _do &rest body)
+  "Evaluate BODY with VAR bound to things in a blockmap block overlapping
+given bbox.
+
+\(fn VAR LEFT RIGHT BOTTOM TOP do BODY...)"
+  (declare (indent 1))
+  (let ((l (gensym "l-")) (r (gensym "r-")) (b (gensym "b-")) (tp (gensym "t-"))
+        (blockmap (gensym "blockmap-"))
+        (origin-x (gensym "origin-x-")) (origin-y (gensym "origin-y-"))
+        (bx (gensym "bx-")) (by (gensym "by-"))
+        (bl (gensym "bl-")) (br (gensym "br-")) (bb (gensym "bb-")) (bt (gensym "bt-")))
+  `(let* ((,l ,left) (,r ,right) (,b ,bottom) (,tp ,top)
+          (,blockmap (ewd-map-blockmap ewd-current-map))
+          (,origin-x (ewd-blockmap-origin-x-fx ,blockmap))
+          (,origin-y (ewd-blockmap-origin-y-fx ,blockmap))
+          (,bl (ash (- ,l ,origin-x ewd-max-radius) ewd-map-block-shift))
+          (,br (ash (+ (- ,r ,origin-x) ewd-max-radius) ewd-map-block-shift))
+          (,bb (ash (- ,b ,origin-y ewd-max-radius) ewd-map-block-shift))
+          (,bt (ash (+ (- ,tp ,origin-y) ewd-max-radius) ewd-map-block-shift)))
+     (cl-loop for ,bx from ,bl to ,br do
+             (cl-loop for ,by from ,bb to ,bt do
+                      (emo-for-each-in-block ,var ,bx ,by do ,@body))))))
 
 (defun emo--kill (target)
   "P_KillMobj in p_inter.c"

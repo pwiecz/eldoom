@@ -464,23 +464,15 @@ Returns true if a player is targeted."
   "A_FireCrackle in p_enemy.c"
   (eac--a-fire mobj))
 
-(cl-defstruct (eac--vile-check-state (:constructor eac--make-vile-check-state)
-                                     (:copier nil))
-  (try-x 0 :type fixnum)
-  (try-y 0 :type fixnum)
-  obj)
-
-(defun eac--vile-check-callback (mobj check-state)
+(defun eac--vile-check-callback (mobj x y)
   "PIT_VileCheck in p_enemy.c"
   (when (and (eldoom-math-has-flag (emo-flags mobj) enf-MF_CORPSE)
              (= (emo-tics mobj) -1)
              (enf-mobj-info-raise-state (emo-info mobj)))
     (let ((max-dist (+ (enf-mobj-info-radius-fx (emo-info mobj))
                        (enf-mobj-info-radius-fx (aref enf-mobj-infos enf-MT_VILE)))))
-      (when (and (<= (abs (- (emo-x-fx mobj) (eac--vile-check-state-try-x check-state)))
-                     max-dist)
-                 (<= (abs (- (emo-y-fx mobj) (eac--vile-check-state-try-y check-state)))
-                     max-dist))
+      (when (and (<= (abs (- (emo-x-fx mobj) x)) max-dist)
+                 (<= (abs (- (emo-y-fx mobj) y)) max-dist))
         (setf (emo-momx mobj) 0
               (emo-momy mobj) 0
               (emo-height-fx mobj) (* 4 (emo-height-fx mobj)))
@@ -489,10 +481,8 @@ Returns true if a player is targeted."
           (when res
             (throw :corpse-hit mobj)))))))
 
-(defvar-local eac--vile-check-state nil)
 (defun eac--a-vile-chase (mobj)
   "A_VileChase in p_enemy.c"
-  (unless eac--vile-check-state (setq eac--vile-check-state (eac--make-vile-check-state)))
   (when-let*
       ((corpse-hit
         (catch :corpse-hit
@@ -503,13 +493,10 @@ Returns true if a player is targeted."
                    (try-y (+ (emo-y-fx mobj)
                              (eldoom-math-mul (enf-mobj-info-speed-fx (emo-info mobj))
                                               (aref eac--y-speed (emo-move-direction mobj))))))
-              (setf (eac--vile-check-state-try-x eac--vile-check-state) try-x
-                    (eac--vile-check-state-try-y eac--vile-check-state) try-y
-                    (eac--vile-check-state-obj eac--vile-check-state) mobj)
-              (emo-for-each-in-block-overlapping-bbox
-               (- try-x ewd-max-radius) (+ try-x ewd-max-radius)
-               (- try-y ewd-max-radius) (+ try-y ewd-max-radius)
-               #'eac--vile-check-callback eac--vile-check-state)
+              (emo-for-each-in-block-overlapping-bbox thing
+                (- try-x ewd-max-radius) (+ try-x ewd-max-radius)
+                (- try-y ewd-max-radius) (+ try-y ewd-max-radius) do
+                (eac--vile-check-callback thing try-x try-y))
               (eac--a-chase mobj)
               nil))))
        (corpse-info (emo-info corpse-hit)))

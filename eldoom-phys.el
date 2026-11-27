@@ -118,7 +118,7 @@ PIT_CheckLine in p_map.c"
     (emo-set-state skull (enf-mobj-info-spawn-state (emo-info skull)))
     (throw :hit t)))
 
-(defun eph--check-thing (mobj _)
+(defun eph--check-thing (mobj)
   "Throw :hit with non-nil value if MOBJ not block the current test move.
 PIT_CheckThing in p_map.c"
   (let* ((flags (emo-flags mobj))
@@ -164,12 +164,10 @@ Return non-nil if BODY can occupy fixed_t position X,Y."
         t
       (not
        (catch :hit
-         (emo-for-each-in-block-overlapping-bbox (eldoom-math-bbox-left eph--tmbbox)
-                                                 (eldoom-math-bbox-right eph--tmbbox)
-                                                 (eldoom-math-bbox-bottom eph--tmbbox)
-                                                 (eldoom-math-bbox-top eph--tmbbox)
-                                                 #'eph--check-thing
-                                                 nil)
+         (emo-for-each-in-block-overlapping-bbox
+             thing (eldoom-math-bbox-left eph--tmbbox) (eldoom-math-bbox-right eph--tmbbox)
+             (eldoom-math-bbox-bottom eph--tmbbox) (eldoom-math-bbox-top eph--tmbbox) do
+             (eph--check-thing thing))
          (emp-for-each-line-in-block-overlapping-bbox
           (eldoom-math-bbox-left eph--tmbbox)
           (eldoom-math-bbox-right eph--tmbbox)
@@ -245,37 +243,26 @@ P_CheckMissileSpawn in p_mobj.c"
   (when (not (eph-try-move missile (emo-x-fx missile) (emo-y-fx missile)))
     (emo-explode-missile missile)))
 
-(cl-defstruct (emp--stomp-state (:constructor emp--make-stomp-state) (:copier nil))
-  thing
-  (x 0 :type fixnum) (y 0 :type fixnum))
-
-(defun eph--stomp-thing (mobj stomp-state)
+(defun eph--stomp-thing (mobj stomping-thing stomping-x stomping-y)
   "PIT_StompThing in p_map.c"
-  (let* ((stomping-thing (emp--stomp-state-thing stomp-state))
-         (stomping-x (emp--stomp-state-x stomp-state))
-         (stomping-y (emp--stomp-state-y stomp-state))
-         (block-dist (+ (emo-radius-fx mobj) (emo-radius-fx stomping-thing))))
+  (let* ((block-dist (+ (emo-radius-fx mobj) (emo-radius-fx stomping-thing))))
     (when (and (eldoom-math-has-flag (emo-flags mobj) enf-MF_SHOOTABLE)
                (< (abs (- (emo-x-fx mobj) stomping-x)) block-dist)
                (< (abs (- (emo-y-fx mobj) stomping-y)) block-dist)
                (not (eq mobj stomping-thing)))
-      (when (not (emo-player stomping-thing)) ;; and map is not 30
+      (when (not (emo-player stomping-thing)) ;; TODO and map is not 30
         (throw :blocked t))
-      (emo-damage mobj stomping-thing stomping-thing 10000))))
+      (emo-damage mobj stomping-thing stomping-thing 10000)
+      nil)))
 
-(defvar-local emp--stomp-state nil)
 (defun eph-teleport-move (mobj x y)
   "P_TeleportMove in p_map.c"
-  (when (not emp--stomp-state) (setq emp--stomp-state (emp--make-stomp-state)))
-  (setf (emp--stomp-state-thing emp--stomp-state) mobj
-        (emp--stomp-state-x emp--stomp-state) x
-        (emp--stomp-state-y emp--stomp-state) y)
   (cl-incf eldoom-globals-iteration) ;; is it really needed?
   (let* ((radius (emo-radius-fx mobj))
          (blocked (catch :blocked
-                    (emo-for-each-in-block-overlapping-bbox (- x radius) (+ x radius)
-                                                            (- y radius) (+ y radius)
-                                                            #'eph--stomp-thing emp--stomp-state))))
+                    (emo-for-each-in-block-overlapping-bbox
+                        thing (- x radius) (+ x radius) (- y radius) (+ y radius) do
+                        (eph--stomp-thing thing mobj x y)))))
     (when (not blocked)
       (emo-unset-position mobj)
       (let* ((new-ss (emp-subsector-at x y))

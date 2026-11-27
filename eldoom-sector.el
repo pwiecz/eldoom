@@ -300,40 +300,38 @@
         (setf (emo-z-fx mobj) (- (emo-ceiling-z mobj) (emo-height-fx mobj)))))
     (>= (- (emo-ceiling-z mobj) (emo-floor-z mobj)) (emo-height-fx mobj))))
 
-(defvar-local ese--no-fit nil)
-
-(defun ese--change-sector-callback (mobj crush)
-  "PIT_ChangeSector in p_map.c"
-  (cond
-   ((ese--thing-height-clip mobj) t)
-   ((<= (emo-health mobj) 0)
-    (emo-set-state mobj (aref enf-states enf-S_GIBS))
-    (setf (emo-flags mobj) (logand (emo-flags mobj) (lognot enf-MF_SOLID))
-          (emo-height-fx mobj) 0
-          (emo-radius-fx mobj) 0))
-   ((eldoom-math-has-flag (emo-flags mobj) enf-MF_DROPPED) (emo-remove mobj))
-   ((not (eldoom-math-has-flag (emo-flags mobj) enf-MF_SHOOTABLE)) t)
-   (t 
-    (setq ese--no-fit t)
-    (when (and crush (zerop (mod eldoom-globals-level-time 3)))
-      (emo-damage mobj nil nil 10)
-      (let ((blood (emo-spawn (emo-x-fx mobj) (emo-y-fx mobj)
-                              (+ (emo-z-fx mobj) (/ (emo-height-fx mobj) 2))
-                              enf-MT_BLOOD)))
-        (setf (emo-momx blood) (ash (- (eldoom-random t) (eldoom-random t)) 12)
-              (emo-momy blood) (ash (- (eldoom-random t) (eldoom-random t)) 12)))))))
-
 (defun ese--change-sector (sector crush)
-  "P_ChangeSector in p_map.c"
-  (setq ese--no-fit nil)
-  (let* ((left (ewd-sector-blockbox-left sector))
+  "Returns t if there is sector height can be set to its current height.
+P_ChangeSector in p_map.c"
+  (let* ((no-fit nil)
+         (left (ewd-sector-blockbox-left sector))
          (right (ewd-sector-blockbox-right sector))
          (bottom (ewd-sector-blockbox-bottom sector))
          (top (ewd-sector-blockbox-top sector)))
     (cl-loop for x from left to right do
              (cl-loop for y from bottom to top do
-                      (emo-for-each-in-block x y #'ese--change-sector-callback crush))))
-  ese--no-fit)
+                      (emo-for-each-in-block
+                          mobj x y do
+                          ;; PIT_ChangeSector in p_map.c
+                          (cond
+                           ((ese--thing-height-clip mobj) t)
+                           ((<= (emo-health mobj) 0)
+                            (emo-set-state mobj (aref enf-states enf-S_GIBS))
+                            (setf (emo-flags mobj) (logand (emo-flags mobj) (lognot enf-MF_SOLID))
+                                  (emo-height-fx mobj) 0
+                                  (emo-radius-fx mobj) 0))
+                           ((eldoom-math-has-flag (emo-flags mobj) enf-MF_DROPPED) (emo-remove mobj))
+                           ((not (eldoom-math-has-flag (emo-flags mobj) enf-MF_SHOOTABLE)) t)
+                           (t 
+                            (setq no-fit t)
+                            (when (and crush (zerop (mod eldoom-globals-level-time 3)))
+                              (emo-damage mobj nil nil 10)
+                              (let ((blood (emo-spawn (emo-x-fx mobj) (emo-y-fx mobj)
+                                                      (+ (emo-z-fx mobj) (/ (emo-height-fx mobj) 2))
+                                                      enf-MT_BLOOD)))
+                                (setf (emo-momx blood) (ash (- (eldoom-random t) (eldoom-random t)) 12)
+                                      (emo-momy blood) (ash (- (eldoom-random t) (eldoom-random t)) 12)))))))))
+    no-fit))
 
 (defun ese--move-plane (sector speed dest crush floor-or-ceiling direction)
   "T_MovePlane in p_floor.c"

@@ -73,7 +73,9 @@ Thinkers with nil action will be removed from the list."
         (setq thinker next-thinker)))))
 
 (defmacro eth-for-each-thinker (var &rest body)
-  "Evaluate BODY with VAR bound to each registered thinker"
+  "Evaluate BODY with VAR bound to each registered thinker
+
+\(fn VAR BODY...)"
   (declare (indent 1))
   (let ((next-thinker (gensym "next-thinker-")))
     `(let ((,var (eth-thinker-next eth--thinkers)))
