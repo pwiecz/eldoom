@@ -41,9 +41,6 @@
 (cl-defstruct (etr-tracer
                (:constructor etr--make-tracer) (:copier nil))
   segment
-  (z-fx 0 :type fixnum)
-  (top-slope 0 :type fixnum)
-  (bottom-slope 0 :type fixnum)
   intercepts)
 
 (defvar-local etr--tracer nil)
@@ -191,8 +188,7 @@ Returns non nil if we should stop checking"
       (setf (eldoom-math-segment-x1 (etr-tracer-segment etr--tracer)) x1
             (eldoom-math-segment-y1 (etr-tracer-segment etr--tracer)) y1
             (eldoom-math-segment-x2 (etr-tracer-segment etr--tracer)) x2
-            (eldoom-math-segment-y2 (etr-tracer-segment etr--tracer)) y2
-            (etr-tracer-z-fx etr--tracer) 0)
+            (eldoom-math-segment-y2 (etr-tracer-segment etr--tracer)) y2)
       (etr--free-intercepts)
       (cl-decf x1 origin-x)
       (cl-decf x2 origin-x)
