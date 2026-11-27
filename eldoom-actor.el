@@ -313,16 +313,13 @@ Returns true if a player is targeted."
                 (not (eldoom-sight-check mobj target)))
         (emo-set-state mobj (enf-mobj-info-see-state (emo-info mobj)))))))
 
-(defvar-local eac--lost-soul-count 0)
-(defun eac--count-lost-souls-callback (thinker _obj)
-  (when (and (emo-p (eth-thinker-object thinker))
-             (= (emo-type (eth-thinker-object thinker)) enf-MT_SKULL))
-    (cl-incf eac--lost-soul-count)))
-
 (defun eac--count-lost-souls ()
-  (setq eac--lost-soul-count 0)
-  (eth-for-each-thinker #'eac--count-lost-souls-callback nil)
-  eac--lost-soul-count)
+  (let ((lost-soul-count 0))
+    (eth-for-each-thinker thinker
+      (when (and (emo-p (eth-thinker-object thinker))
+                 (= (emo-type (eth-thinker-object thinker)) enf-MT_SKULL))
+        (cl-incf lost-soul-count)))
+    lost-soul-count))
 
 (defun eac--a-skull-attack (mobj)
   "A_SkullAttack in p_enemy.c"
@@ -647,18 +644,17 @@ Returns true if a player is targeted."
 (defvar-local eac--boss-targets nil)
 (defvar-local eac--boss-target-count 0)
 (defvar-local eac--boss-target-ix 0)
-(defun eac--find-boss-targets-callback (thinker _)
-  (when (and (emo-p (eth-thinker-object thinker))
-             (< eac--boss-target-count 32)
-             (= (emo-type (eth-thinker-object thinker)) enf-MT_BOSSTARGET))
-    (aset eac--boss-targets eac--boss-target-count (eth-thinker-object thinker))
-    (cl-incf eac--boss-target-count)))
 
 (defun eac--a-brain-awake (_mobj)
   "A_BrainAwake in p_enemy.c"
   (when (not eac--boss-targets) (setq eac--boss-targets (make-vector 32 nil)))
   (setq eac--boss-target-count 0)
-  (eth-for-each-thinker #'eac--find-boss-targets-callback nil)
+  (eth-for-each-thinker thinker
+    (when (and (emo-p (eth-thinker-object thinker))
+               (< eac--boss-target-count 32)
+               (= (emo-type (eth-thinker-object thinker)) enf-MT_BOSSTARGET))
+      (aset eac--boss-targets eac--boss-target-count (eth-thinker-object thinker))
+      (cl-incf eac--boss-target-count)))
   (setq eac--boss-target-ix 0))
 
 (defun eac--a-brain-pain (_mobj)
@@ -736,23 +732,18 @@ Returns true if a player is targeted."
       (eph-teleport-move spawn (emo-x-fx spawn) (emo-y-fx spawn))
       (emo-remove mobj))))
 
-
-(defvar-local eac--live-keen-exists-p nil)
-
-(defun eac--look-for-live-keen (thinker keen)
-  (when (emo-p (eth-thinker-object thinker))
-    (let* ((mobj (eth-thinker-object thinker)))
-      (when (and (= (emo-type mobj) (emo-type keen))
-                 (> (emo-health mobj) 0))
-        (setq eac--live-keen-exists-p t)))))
-
 (defun eac--a-keen-die (mobj)
   "A_KeenDie in p_enemy.c"
   (eac--a-fall mobj)
-  (setq eac--live-keen-exists-p nil)
-  (eth-for-each-thinker #'eac--look-for-live-keen mobj)
-  (when eac--live-keen-exists-p
-    (ese-do-door (ewd--make-linedef :sector-tag 666) :open)))
+  (let ((live-keen-exists-p nil))
+    (eth-for-each-thinker thinker
+      (when (emo-p (eth-thinker-object thinker))
+        (let* ((mobj (eth-thinker-object thinker)))
+          (when (and (= (emo-type mobj) (emo-type mobj))
+                     (> (emo-health mobj) 0))
+            (setq live-keen-exists-p t)))))
+    (unless live-keen-exists-p
+      (ese-do-door (ewd--make-linedef :sector-tag 666) :open))))
 
 (defun eac--a-spawn-sound (mobj)
   "A_SpawnSound in p_enemy.c"

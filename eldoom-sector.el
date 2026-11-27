@@ -996,12 +996,14 @@
                         (setq min-light (min min-light (ewd-sector-light other-sector)))))
              (setf (ewd-sector-light sector) min-light))))
 
-(defun ese--find-teleport-destination (thinker sector)
-  (let ((mobj (eth-thinker-object thinker)))
-    (when (and (emo-p mobj)
-               (= (emo-type mobj) enf-MT_TELEPORTMAN)
-               (eq (ewd-subsector-sector (emo-subsector mobj)) sector))
-      (throw :teleport mobj))))
+(defun ese--find-teleport-destination-in-sector (sector)
+  (catch :teleport
+    (eth-for-each-thinker thinker
+      (let ((mobj (eth-thinker-object thinker)))
+        (when (and (emo-p mobj)
+                   (= (emo-type mobj) enf-MT_TELEPORTMAN)
+                   (eq (ewd-subsector-sector (emo-subsector mobj)) sector))
+          (throw :teleport mobj))))))
 
 (defun ese-teleport (linedef from-side mobj)
   "EV_Teleport in p_telept.c"
@@ -1009,8 +1011,7 @@
     (when (and from-side
                (not (eldoom-math-has-flag (emo-flags mobj) enf-MF_MISSILE)))
       (cl-loop for sector across (ewd-linedef-tagged-sectors linedef) do
-               (when-let* ((teleport-thing (catch :teleport 
-                                             (eth-for-each-thinker #'ese--find-teleport-destination sector))))
+               (when-let* ((teleport-thing (ese--find-teleport-destination-in-sector sector)))
                  (let ((old-x (emo-x-fx mobj))
                        (old-y (emo-y-fx mobj))
                        (old-z (emo-z-fx mobj)))

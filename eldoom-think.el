@@ -72,13 +72,16 @@ Thinkers with nil action will be removed from the list."
           (eth--unregister thinker))
         (setq thinker next-thinker)))))
 
-(defun eth-for-each-thinker (callback obj)
-  (let ((thinker (eth-thinker-next eth--thinkers)))
-    (while (not (eq thinker eth--thinkers))
-      (let ((next-thinker (eth-thinker-next thinker)))
-        (when (eth-thinker-action thinker)
-          (funcall callback thinker obj))
-        (setq thinker next-thinker)))))
+(defmacro eth-for-each-thinker (var &rest body)
+  "Evaluate BODY with VAR bound to each registered thinker"
+  (declare (indent 1))
+  (let ((next-thinker (gensym "next-thinker-")))
+    `(let ((,var (eth-thinker-next eth--thinkers)))
+       (while (not (eq ,var eth--thinkers))
+         (let ((,next-thinker (eth-thinker-next ,var)))
+           (when (eth-thinker-action ,var)
+             ,@body)
+           (setq ,var ,next-thinker))))))
 
 (defun eth--mobj-thinker (mobj)
   "P_MobjThinker in p_mobj.c"
